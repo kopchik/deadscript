@@ -16,11 +16,19 @@ class Func(Node):
     return self.body.run(frame)
 
 
+class Block(Node):
+  def run(self, frame):
+    r = None
+    for e in self:
+      r = e.run(frame)
+    return r
+
+
 class Print(Node):
   fields = ['arg']
   def run(self, frame):
     r = self.arg.run(frame)
-    print(r)
+    print(r.to_string(frame))
     return self.arg
 
 
@@ -49,11 +57,17 @@ class Int(Leaf):
   def __init__(self, value):
     self.value = int(value)
 
+  def __repr__(self):
+    return "\"%s\"" % self.value
+
   def __str__(self):
     return str(self.value)
 
   def __add__(self, right):
     return Int(self.value + right.value)
+
+  def to_string(self, frame):
+    return str(self)
 
   def run(self, frame):
     return self
@@ -63,16 +77,19 @@ class Str(ast.Leaf):
   def __str__(self):
     return self.value[1:-1]
 
-  def run(self, frame):
+  def to_string(self, frame):
     replace = {r'\n': '\n', r'\t': '\t'}
     string = self.value.strip('"')
     varnames = re.findall("\{([a-zA-Z\.]+)\}", string, re.M)
     for name in varnames:
-        value = str( Var(name).run(frame) )
+        value = Var(name).run(frame).to_string(frame)
         string = string.replace("{%s}" % name, value)
     for k,v in replace.items():
       string = string.replace(k, v)
     return string
+
+  def run(self, frame):
+    return self
 
 
 class ShellCmd(Str):
@@ -83,9 +100,14 @@ class ShellCmd(Str):
     return raw.decode()
 
 
-class Array(Leaf):
+class Array(Node):
+  def to_string(self, frame):
+    #TODO: recursively call to_string
+    # print(type(self.value[0]))
+    return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
+
   def run(self, frame):
-    return self.value
+    return self
 
 
 class Var(Leaf):
@@ -132,6 +154,10 @@ def replace_nodes(node, depth):
     if isinstance(node.left, (Str, ast.Str)):
       return RegMatch(node.right, node.left)
     return RegMatch(node.left, node.right)
+  if isinstance(node, ast.Block):
+    return Block(*node)
+  if isinstance(node, ast.Brackets):
+    return Array(node.value)
   return node
 
 
@@ -153,5 +179,5 @@ def run(ast, args=[]):
   with frame as newframe:
     func = newframe['main']
     newframe['argc'] = Int(len(args))
-    newframe['argv'] = Array(args)
+    newframe['argv'] = Array(*map(Str,args))
     func.run(newframe)

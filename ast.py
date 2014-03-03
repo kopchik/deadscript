@@ -19,7 +19,7 @@ class Node(list):
     super().__init__(args)
 
   def __getattr__(self, name):
-    assert name in self.fields, "Unknown field %s" % name
+    assert name in self.fields, "Unknown field %s for %s" % (name, type(self))
     idx = self.fields.index(name)
     return self[idx]
 
@@ -32,7 +32,10 @@ class Node(list):
 
   def __repr__(self):
     cls = self.__class__.__name__
-    args = ", ".join("%s=%s"%(name, getattr(self,name)) for name in self.fields)
+    if self.fields:
+      args = ", ".join("%s=%s"%(name, getattr(self,name)) for name in self.fields)
+    else:
+      args = ", ".join(map(str,self))
     return "%s(%s)" % (cls, args)
 
 
@@ -63,7 +66,7 @@ class Block(Node):
     return self
 
   def __repr__(self):
-    return "Block(%s)" % ", ".join(str(t) for t in self)
+    return "Block!(%s)" % ", ".join(str(t) for t in self)
   __str__ = __repr__
 
 
@@ -141,6 +144,11 @@ class Lambda(Binary):
 class Parens(Unary):
   pass
 
+@brackets('[',']')
+class Brackets(Unary):
+  pass
+
+
 @infix(',', 1)
 class Comma(Node):
   fields = None
@@ -191,10 +199,8 @@ def rewrite(tree, f, d=0, **kwargs):
 #   return nodes
 
 def precedence(node, depth):
-  print(type(node))
   if not isinstance(node, Expr):
     return node
-  print("got expr", node)
   return pratt_parse(node)
 
 
