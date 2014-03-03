@@ -1,53 +1,68 @@
 from tokenizer import DENT
 from log import Log
+from copy import copy
+from ast import Block, Expr
 log = Log("indent")
 
 
-def implicit_dents(ast):
+def implicit_dents(tokens):
+  tokens = copy(tokens)
   c = 0
-  for i,t in enumerate(ast):
+  for i,t in enumerate(tokens):
     if isinstance(t, DENT):
       c = t.value
     elif hasattr(t, "sym") and t.sym == "->":
-      for t in ast[i:]:
+      for t in tokens[i:]:
         if isinstance(t, DENT):
           if t.value > c:
-            ast.insert(i+1, DENT(t.value))
+            tokens.insert(i+1, DENT(t.value))
           break
-  return ast
+  return tokens
+
+
+def merge_dents(tokens):
+  tokens = copy(tokens)
+  i = 0
+  while i < len(tokens)-1:
+    if isinstance(tokens[i], DENT) and isinstance(tokens[i+1], DENT):
+      del tokens[i]
+    else:
+      i += 1
+  return tokens
 
 
 def blocks(it, lvl=0):
-  blk = []
-  result = [blk]
+  expr = Expr()
+  codeblk = Block(expr)
   prefix = "  "*lvl
   for t in it:
     # print(prefix, "got", t, end=' ')
     if isinstance(t, DENT):
       cur = t.value
-      if cur == lvl and blk:
-        # print(prefix, "new statement")
-        blk = []
-        result.append(blk)
+      if cur == lvl and expr:
+        # print(prefix, "new expr")
+        expr = Expr()
+        codeblk.append(expr)
         continue
       elif cur > lvl:
         # print(prefix, "nested block")
         r, cur = blocks(it, cur)
         # print(prefix, "got", r, cur, "from it")
-        blk.append(r)
+        expr.append(r)
       if cur < lvl:
           # print(prefix, "time to return")
-          return result, cur
+          return codeblk, cur
     else:
       # print(prefix, "adding it to current block")
-      blk.append(t)
-  return result, lvl
+      expr.append(t)
+  return codeblk, lvl
 
 
 def parse(tokens):
   tokens = implicit_dents(tokens)
   log.imp_dents("after adding implicit dents:\n", tokens)
-
+  tokens = merge_dents(tokens)
+  log.merge_dents("merging dents:\n", tokens)
   ast, _ = blocks(iter(tokens))
   log.blocks("after block parser:\n", ast)
   return ast

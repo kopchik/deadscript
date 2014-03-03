@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
-from functools import partial
-
 from pratt import prefix, infix, infix_r, postfix, brackets, \
   symap, parse as pratt_parse
-from useful.mstring import s
+# from useful.mstring import s
 from log import Log
 log = Log('ast')
 
@@ -48,9 +46,6 @@ class Leaf:
     cls = self.__class__.__name__
     return "%s:%s" % (cls, self.value)
 
-  def __iter__(self):
-    return iter([])
-
   def nud(self):
     return self
 
@@ -63,32 +58,32 @@ class Binary(Node):
   fields = ['left', 'right']
 
 
-###########
-# SPECIAL #
-###########
-
-class Id(Leaf):
-  def __str__(self):
-    return self.value
-
-
-##############
-# Data types #
-##############
-
 class Block(Node):
-  def __repr__(self):
-    return "%s(%s)" % (self.__class__.__name__, super().__repr__())
-  __str__ = __repr__
-
   def nud(self):
     return self
 
+  def __repr__(self):
+    return "Block(%s)" % ", ".join(str(t) for t in self)
+  __str__ = __repr__
+
+
+class Expr(Node):
+  def __repr__(self):
+    return "Expr(%s)" % ", ".join(str(s) for s in self)
+
+
+##############
+# Data Types #
+##############
 
 class Str(Leaf): pass
 class ShellCmd(Leaf):  pass
 class RegEx(Leaf):  pass
 class Int(Leaf):  pass
+
+class Id(Leaf):
+  def __str__(self):
+    return self.value
 
 
 #########
@@ -183,24 +178,24 @@ def rewrite(tree, f, d=0, **kwargs):
   return tree
 
 
-def add_blocks(node, depth):
-  """Add blocks"""
-  if isinstance(node, list):
-    return Block(node)
-  return node
+# def precedence(ast):
+#   nodes = []
+#   for e in ast:
+#     if isinstance(e, Block) and e:
+#       expr = precedence(e)
+#       if isinstance(expr, Expr):
+#         expr = pratt_parse(expr)
+#       nodes.append(expr)
+#     else:
+#       nodes.append(e)
+#   return nodes
 
-
-def precedence(ast):
-  nodes = []
-  for e in ast:
-    if isinstance(e, list) and e:
-      expr = precedence(e)
-      if isinstance(expr, list):
-        expr = pratt_parse(expr)
-      nodes.append(expr)
-    else:
-      nodes.append(e)
-  return nodes
+def precedence(node, depth):
+  print(type(node))
+  if not isinstance(node, Expr):
+    return node
+  print("got expr", node)
+  return pratt_parse(node)
 
 
 def pretty_print(ast, lvl=0):
@@ -225,9 +220,8 @@ def parse_args(node, depth):
 
 
 def parse(ast):
-  ast = rewrite(ast, add_blocks)
-  log.blocks("after block parser:\n", ast)
-  ast = precedence(ast)
+  # ast = precedence(ast)
+  ast = rewrite(ast, precedence)
   log.pratt("after pratt parser:\n", ast)
 
   ast = rewrite(ast, parse_args)
