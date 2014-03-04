@@ -114,6 +114,30 @@ class brackets:
     return cls
 
 
+class subscript:
+  """ Postfix subscriptions
+  """
+  def __init__(self, *args):
+    if len(args) == 2:   # no close tag defined
+      self.open, self.lbp = args
+      self.close = None
+    elif len(args) == 3: # there is a close tag
+      self.open, self.close, self.lbp = args
+
+  def __call__(self, cls):
+    open  = self.open
+    close = self.close
+    lbp   = self.lbp
+    def led(self, left):
+      right = expr()
+      if close:
+        advance(close)
+      return cls(left, right)
+    symbol(open, lbp=1000).led = led
+    symbol(close)
+    return cls
+
+
 ###################
 # PRATT MACHINERY #
 ###################
@@ -142,10 +166,12 @@ def expr(rbp=0):
 
 def parse(tokens):
   global cur, nxt, e
-  log.debug("parsing", tokens)
+  log.pratt("parsing", tokens)
   assert symap, "No operators registered." \
     "Please define at least one operator decorated with infix()/prefix()/etc"
   cur = nxt = None
   e = chain(tokens, [END])
   cur, nxt = shift()
-  return expr()
+  result = expr()
+  log.pratt("result", result)
+  return result

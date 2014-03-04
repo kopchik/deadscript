@@ -1,4 +1,4 @@
-from ast import Node, Leaf, rewrite
+from ast import Node, Binary, Leaf, rewrite
 from frame import Frame
 from log import Log
 import ast
@@ -69,6 +69,12 @@ class Int(Leaf):
   def to_string(self, frame):
     return str(self)
 
+  def to_int(self, frame):
+    return self.value
+
+  def sub(self, other):
+    return Int(self.value-other.value)
+
   def run(self, frame):
     return self
 
@@ -106,6 +112,9 @@ class Array(Node):
     # print(type(self.value[0]))
     return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
 
+  def subscript(self, idx):
+    return self[idx]
+
   def run(self, frame):
     return self
 
@@ -118,18 +127,36 @@ class Var(Leaf):
     return frame[self.value]
 
 
-class Add(Node):
-  fields = ['left', 'right']
+class Add(Binary):
   def run(self, frame):
     left = self.left.run(frame)
     right = self.right.run(frame)
     return left + right
 
 
+class Assign(Binary):
+  def run(self, frame):
+    value = self.right.run(frame)
+    frame[str(self.left)] = value
+    return value
+
+
 class Parens(ast.Parens):
   def run(self, frame):
     return self.value.run(frame)
 
+class Sub(ast.Sub):
+  def run(self, frame):
+    left = self.left.run(frame)
+    right = self.left.run(frame)
+    result = right.sub(left)
+    return result
+
+class Subscript(ast.Subscript):
+  def run(self, frame):
+    idx = self.right.run(frame).to_int(frame)
+    var = self.left.run(frame)
+    return var.subscript(idx)
 
 def replace_nodes(node, depth):
   if isinstance(node, ast.Int):
@@ -158,11 +185,20 @@ def replace_nodes(node, depth):
     return Block(*node)
   if isinstance(node, ast.Brackets):
     return Array(node.value)
+  if isinstance(node, ast.Eq):
+    return Assign(*node)
+  if isinstance(node, ast.Subscript):
+    return Subscript(*node)
+  if isinstance(node, ast.Sub):
+    return Sub(*node)
+
   return node
 
 
 def populate_top_frame(node, depth, frame):
-  if depth == 0 and isinstance(node, ast.Eq):
+  if depth == 0:
+    print("!", node)
+  if depth == 0 and isinstance(node, Assign):
     key   = str(node.left)
     value = node.right
     frame[key] = value
@@ -173,8 +209,13 @@ def run(ast, args=[]):
   frame = Frame()
   ast = rewrite(ast, replace_nodes)
   log.final_ast("the final AST is:\n", ast)
+
   ast = rewrite(ast, populate_top_frame, frame=frame)
   log.topframe("the top frame is\n", frame)
+
+  if 'main' not in frame:
+    print("no main function defined, exiting")
+    return
 
   with frame as newframe:
     func = newframe['main']

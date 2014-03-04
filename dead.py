@@ -21,7 +21,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   logfilter.rules = [
-    ('interpreter.*', False)
+    ('interpreter.*', True)
   ]
 
   if args.debug: logfilter.default = True

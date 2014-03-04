@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pratt import prefix, infix, infix_r, postfix, brackets, \
-  symap, parse as pratt_parse
+  subscript, symap, parse as pratt_parse
 # from useful.mstring import s
 from log import Log
 log = Log('ast')
@@ -40,6 +40,7 @@ class Node(list):
 
 
 class Leaf:
+  lbp = 0
   def __init__(self, value):
     assert not hasattr(self, 'fields'), "Leaf cannot have fields attribute"
     self.value = value
@@ -148,6 +149,9 @@ class Parens(Unary):
 class Brackets(Unary):
   pass
 
+@subscript('[', ']', -1000)
+class Subscript(Binary):
+  pass
 
 @infix(',', 1)
 class Comma(Node):

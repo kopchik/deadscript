@@ -1,4 +1,5 @@
 main = (argc, argv) ->
-  p "Hello, {argv}"
-  p ["a"]
-  p argc
+  idx = 1 - 1
+  name = argv[idx]
+  p "Hello, {name}"
+  | 1 => 2
