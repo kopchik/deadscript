@@ -1,5 +1,5 @@
 from peg import RE, SOMEOF, MAYBE, OR, SYMBOL
-from ast import symap, Id, Int, Str, ShellCmd, RegEx
+from ast import symap, Id, Match, Int, Str, ShellCmd, RegEx
 from log import Log
 
 log = Log("tokenizer")
@@ -26,13 +26,14 @@ END = EOL | (COMMENT+EOL)
 
 # IDENTIFIER (FUNCTION NAMES, VARIABLES, ETC)
 ID = RE(r'[A-Za-z_][a-zA-Z0-9_]*', Id)
+MATCH = SYMBOL('match', Match)
 
 # put longest operators first because for PEG first match wins
 operators = []
 for sym in sorted(symap.keys(), key=len, reverse=True):
   operators += [SYMBOL(sym, symap[sym])]
 OPERATOR = OR(*operators)
-PROGRAM = SOMEOF(CONST, OPERATOR, ID, COMMENT) #+ END
+PROGRAM = SOMEOF(CONST, OPERATOR, ID, MATCH, COMMENT) #+ END
 
 
 class DENT:
@@ -58,5 +59,5 @@ def tokenize(raw):
     ts, pos = PROGRAM.parse(l)
     # assert len(t) == pos, "cannot parse %s" % t
     tokens += ts
-  log.debug("after tokenizer:\n", tokens)
+  log("after tokenizer:\n", tokens)
   return tokens
