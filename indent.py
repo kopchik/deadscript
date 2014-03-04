@@ -11,7 +11,7 @@ def implicit_dents(tokens):
   for i,t in enumerate(tokens):
     if isinstance(t, DENT):
       c = t.value
-    elif hasattr(t, "sym") and t.sym == "->":
+    elif hasattr(t, "sym") and t.sym in ["->", "=>"]:
       for t in tokens[i:]:
         if isinstance(t, DENT):
           if t.value > c:
@@ -32,30 +32,35 @@ def merge_dents(tokens):
 
 
 def blocks(it, lvl=0):
+  cur = lvl
   expr = Expr()
-  codeblk = Block(expr)
-  prefix = "  "*lvl
+  blk = Block(expr)
+  prefix = str(lvl)+" "*(lvl-1)
   for t in it:
-    # print(prefix, "got", t, end=' ')
+    log.indent(prefix, "considering", t)
     if isinstance(t, DENT):
       cur = t.value
       if cur == lvl and expr:
-        # print(prefix, "new expr")
+        log.indent(prefix, "got newline, starting new expr")
         expr = Expr()
-        codeblk.append(expr)
+        blk.append(expr)
         continue
       elif cur > lvl:
-        # print(prefix, "nested block")
+        log.indent(prefix, ">>> calling nested block")
         r, cur = blocks(it, cur)
-        # print(prefix, "got", r, cur, "from it")
+        log.indent(prefix, "<<< got %s from it with level" % (r, cur))
         expr.append(r)
-      if cur < lvl:
-          # print(prefix, "time to return")
-          return codeblk, cur
+        if cur == lvl:
+          log.indent(prefix, "!!! starting new expression")
+          expr = Expr()
+          blk.append(expr)
     else:
-      # print(prefix, "adding it to current block")
+      log.indent(prefix, "adding %s to expr %s" % (t,expr))
       expr.append(t)
-  return codeblk, lvl
+    if cur < lvl:
+        log.indent(prefix, "<== %s < %s: time to return" % (cur, lvl))
+        return blk, cur
+  return blk, lvl
 
 
 def parse(tokens):
