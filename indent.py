@@ -48,7 +48,7 @@ def blocks(it, lvl=0):
       elif cur > lvl:
         log.indent(prefix, ">>> calling nested block")
         r, cur = blocks(it, cur)
-        log.indent(prefix, "<<< got %s from it with level" % (r, cur))
+        log.indent(prefix, "<<< got %s from it with level %s" % (r, cur))
         expr.append(r)
         if cur == lvl:
           log.indent(prefix, "!!! starting new expression")
