@@ -63,7 +63,12 @@ class Binary(Node):
 
 
 class Block(Node):
+  lbp = 1
   def nud(self):
+    return self
+
+  def led(self, left):
+    print("LEFT:", left)
     return self
 
   def __repr__(self):
@@ -86,9 +91,9 @@ class RegEx(Leaf):  pass
 class Int(Leaf):  pass
 
 class Id(Leaf):
-  def __str__(self):
-    return self.value
-
+  #def __str__(self):
+  #  return self.value
+  pass
 
 #########
 # UNARY #
@@ -106,6 +111,9 @@ class Plus(Unary):
 class Print(Unary):
   pass
 
+class Match(Node):
+  pass
+
 # @prefix('->', 2)
 # class Lambda0(Unary):
 #   pass
@@ -120,19 +128,26 @@ class CALL(Unary):
 ##########
 
 @infix('+', 10)
-class Add(Binary):
-  pass
+class Add(Binary): pass
 
 @infix('-', 10)
-class Sub(Binary):
-  pass
+class Sub(Binary): pass
 
 @infix_r('^', 30)
-class Pow(Binary):
-  pass
+class Pow(Binary): pass
 
 @infix_r('=', 1)
 class Eq(Binary): pass
+
+@infix('<', 2)
+class Less(Binary): pass
+
+@infix('>', 2)
+class More(Binary): pass
+
+@infix('=>', 1)
+class IfThen(Binary):
+  fields = ['iff', 'then']
 
 @infix('=~', 3)
 class RegMatch(Binary): pass
@@ -142,16 +157,13 @@ class Lambda(Binary):
   fields = ['args', 'body']
 
 @brackets('(',')')
-class Parens(Unary):
-  pass
+class Parens(Unary): pass
 
 @brackets('[',']')
-class Brackets(Unary):
-  pass
+class Brackets(Unary): pass
 
 @subscript('[', ']', -1000)
-class Subscript(Binary):
-  pass
+class Subscript(Binary): pass
 
 @infix(',', 1)
 class Comma(Node):
