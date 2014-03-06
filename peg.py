@@ -64,7 +64,6 @@ class Composer(Grammar):
     return "%s(%s)" % (cls, self.things)
 
 
-
 class OR(Composer):
   """ First match wins
   """
@@ -116,12 +115,6 @@ class ALL(Composer):
       result += [r]
     return result, pos
 
-
-# class EOL(RE):
-#   super().__init__(r'$', "EOL")
-#   def parse(self, text, pos=0):
-#     r, pos = super().parse(text, pos)
-#     return
 
 if __name__ == '__main__':
   INTCONST = RE(r'[-]{0,1}\d+')
