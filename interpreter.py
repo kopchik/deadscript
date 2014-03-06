@@ -124,7 +124,11 @@ class Int(Value):
   def Sub(self, other):
     return Int(self.value-other.value)
 
+  def run(self, frame):
+    return self
 
+
+@replaces(ast.Str)
 class Str(ast.Leaf):
   def __str__(self):
     return self.value[1:-1]
@@ -165,12 +169,16 @@ class Array(Node):
     return self
 
 
+@replaces(ast.Id)
 class Var(Leaf):
   def __str__(self):
     return str(self.value)
 
   def run(self, frame):
-    return frame[self.value]
+    try:
+      return frame[self.value]
+    except KeyError:
+      raise Exception("unknown variable \"%s\"" % self.value)
 
 
 @replaces(ast.Add)
@@ -206,7 +214,8 @@ class Sub(BinOp):
 class IfThen(ast.IfThen):
   def run(self, frame):
     if self.iff.run(frame):
-      self.then.run(frame)
+      return True, self.then.run(frame)
+    return False, 0
 
 
 @replaces(ast.Subscript)
@@ -214,11 +223,24 @@ class Subscript(BinOp):
   same_type_operands = False
 
 
+@replaces(ast.Match)
+class Match(Unary):
+  def run(self, frame):
+    for expr in self.value:
+      assert isinstance(expr, IfThen), \
+        "Child nodes of match operator can only be instances of IfThen"
+      match, result = expr.run(frame)
+      if match:
+        return result
+
+
+@replaces(ast.AlwaysTrue)
+class AlwaysTrue(Leaf):
+  def run(self, frame):
+    return True
+
+
 def replace_nodes2(node, depth):
-  if isinstance(node, ast.Str):
-    return Str(node.value)
-  if isinstance(node, ast.Id):
-    return Var(node.value)
   if isinstance(node, ast.ShellCmd):
     return ShellCmd(node.value)
   if isinstance(node, ast.RegEx):
@@ -233,8 +255,6 @@ def replace_nodes2(node, depth):
 
 
 def populate_top_frame(node, depth, frame):
-  if depth == 0:
-    print("!", node)
   if depth == 0 and isinstance(node, Assign):
     key   = str(node.left)
     value = node.right
