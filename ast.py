@@ -152,6 +152,9 @@ class Add(Binary): pass
 @infix('-', 10)
 class Sub(Binary): pass
 
+@infix('*', 20)
+class Mul(Binary): pass
+
 @infix_r('^', 30)
 class Pow(Binary): pass
 
@@ -227,8 +230,10 @@ def rewrite(tree, f, d=0, **kwargs):
 def precedence(node, depth):
   if not isinstance(node, Expr):
     return node
-  return pratt_parse(node)
-
+  try:
+    return pratt_parse(node)
+  except Exception as err:
+    raise Exception("cannot process expression %s" % node) from Exception
 
 def func_args(node, depth):
   """ Parses function arguments. """
