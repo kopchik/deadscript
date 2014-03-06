@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pratt import prefix, infix, infix_r, postfix, brackets, \
-  subscript, symap, parse as pratt_parse
+  subscript, action, symap, parse as pratt_parse
 from log import Log
 log = Log('ast')
 
@@ -85,13 +85,13 @@ class Expr(Node):
 class Block(Node):
   """ It's block of one or more separate expressions.
   """
-  lbp = 1
+  # lbp = 1
   def nud(self):
     return self
 
-  def led(self, left):
-    print("LEFT:", left)
-    return self
+  # def led(self, left):
+  #   print("LEFT:", left)
+  #   return self
 
   def __repr__(self):
     return "Block!(%s)" % ", ".join(str(t) for t in self)
@@ -106,38 +106,40 @@ class Str(Leaf): pass
 class ShellCmd(Leaf):  pass
 class RegEx(Leaf):  pass
 class Int(Leaf):  pass
+class Id(Leaf): pass
 
-class Id(Leaf):
-  #def __str__(self):
-  #  return self.value
+
+###########
+# SPECIAL #
+###########
+
+@prefix('p', 0)
+class Print(Unary):
   pass
+
+@action('_')
+class AlwaysTrue(Leaf):
+  pass
+
 
 #########
 # UNARY #
 #########
 
 @prefix('-', 100)
-class Minus(Unary):
-  pass
+class Minus(Unary): pass
 
 @prefix('+', 100)
-class Plus(Unary):
-  pass
+class Plus(Unary): pass
 
-@prefix('p', 0)
-class Print(Unary):
-  pass
+@prefix('match', 1)
+class Match(Node): pass
 
-class Match(Node):
-  pass
-
-# @prefix('->', 2)
-# class Lambda0(Unary):
-#   pass
+@prefix('->', 2)
+class Lambda0(Unary): pass
 
 @postfix('!', 3)
-class CALL(Unary):
-  pass
+class CALL(Unary): pass
 
 
 ##########
