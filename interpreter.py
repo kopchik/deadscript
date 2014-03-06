@@ -1,4 +1,4 @@
-from ast import Node, Binary, Leaf, rewrite
+from ast import Node, Unary, Binary, Leaf, rewrite
 from collections import OrderedDict
 from frame import Frame
 from log import Log
@@ -26,17 +26,24 @@ def replace_nodes(node, depth):
     for oldCls, newCls in astMap.items():
       if isinstance(node, oldCls):
         log.replace("replacing %s (%s)" % (node, type(node)))
+        if isinstance(node, Leaf):
+          return newCls(node.value)
         return newCls(*node)
     return node
+
+
+class Value(Leaf):
+  def run(self, frame):
+    return self
 
 
 class BinOp(Binary):
   def run(self, frame):
     opname = self.__class__.__name__
-    left = self.left(frame)
-    right = self.right(frame)
+    left = self.left.run(frame)
+    right = self.right.run(frame)
     assert type(left) == type(right), \
-      "left and right values should have the same type,"
+      "left and right values should have the same type," \
       "got %s and %s insted" % (left, right)
     assert hasattr(left, opname), \
       "%s does not support %s operation" % (left, opname)
@@ -90,7 +97,7 @@ class RegMatch(Binary):
 
 
 @replaces(ast.Int)
-class Int(Leaf):
+class Int(Value):
   def __init__(self, value):
     self.value = int(value)
 
@@ -106,14 +113,11 @@ class Int(Leaf):
   def to_string(self, frame):
     return str(self)
 
-  def to_int(self, frame):
+  def to_int(self):
     return self.value
 
-  def sub(self, other):
+  def Sub(self, other):
     return Int(self.value-other.value)
-
-  def run(self, frame):
-    return self
 
 
 class Str(ast.Leaf):
@@ -149,8 +153,8 @@ class Array(Node):
     # print(type(self.value[0]))
     return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
 
-  def subscript(self, idx):
-    return self[idx]
+  def Subscript(self, idx):
+    return self[idx.to_int()]
 
   def run(self, frame):
     return self
@@ -180,22 +184,21 @@ class Assign(BinOp):
 
 
 @replaces(ast.Parens)
-class Parens(Unrary):
+class Parens(Unary):
   def run(self, frame):
     return self.value.run(frame)
 
-@replaces(ast.Sub)
-class Sub(BinOp): pass
 
-class Subscript(ast.Subscript):
-  def run(self, frame):
-    idx = self.right.run(frame).to_int(frame)
-    var = self.left.run(frame)
-    return var.subscript(idx)
+@replaces(ast.Sub)
+class Sub(BinOp):
+  pass
+
+
+@replaces(ast.Subscript)
+class Subscript(BinOp):
+  pass
 
 def replace_nodes2(node, depth):
-  # if isinstance(node, ast.Int):
-  #   return Int(node.value)
   if isinstance(node, ast.Str):
     return Str(node.value)
   if isinstance(node, ast.Add):
@@ -212,9 +215,6 @@ def replace_nodes2(node, depth):
     return RegMatch(node.left, node.right)
   if isinstance(node, ast.Brackets):
     return Array(node.value)
-  if isinstance(node, ast.Subscript):
-    return Subscript(*node)
-
   return node
 
 
