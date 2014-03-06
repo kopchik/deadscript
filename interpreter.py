@@ -78,6 +78,7 @@ class Print(Node):
     return self.arg
 
 
+@replaces(ast.RegEx)
 class RegEx(Leaf):
   def match(self, string, frame):
     expr = self.value[1:-1]
@@ -89,7 +90,7 @@ class RegEx(Leaf):
       frame.update(groupdict)
     group = m.group()
     if group:
-      return group
+      return Str(group)
     return True
 
 
@@ -109,20 +110,23 @@ class Int(Value):
   def __str__(self):
     return str(self.value)
 
-  def __add__(self, right):
-    return Int(self.value + right.value)
-
   def to_string(self, frame):
     return str(self)
 
   def to_int(self):
     return self.value
 
+  def Add(self, right):
+    return Int(self.value + right.value)
+
   def Eq(self, other):
     return self.value == other.value
 
   def Sub(self, other):
     return Int(self.value-other.value)
+
+  def Mul(self, other):
+    return Int(self.value*other.value)
 
   def run(self, frame):
     return self
@@ -156,10 +160,10 @@ class ShellCmd(Str):
     return raw.decode()
 
 
+@replaces(ast.Brackets)
 class Array(Node):
   def to_string(self, frame):
     #TODO: recursively call to_string
-    # print(type(self.value[0]))
     return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
 
   def Subscript(self, idx):
@@ -182,9 +186,10 @@ class Var(Leaf):
 
 
 @replaces(ast.Add)
-class Add(BinOp):
-  pass
+class Add(BinOp): pass
 
+@replaces(ast.Mul)
+class Mul(BinOp): pass
 
 @replaces(ast.Assign)
 class Assign(BinOp):
@@ -193,22 +198,16 @@ class Assign(BinOp):
     frame[str(self.left)] = value
     return value
 
-
 @replaces(ast.Eq)
-class Eq(BinOp):
-  pass
-
+class Eq(BinOp): pass
 
 @replaces(ast.Parens)
 class Parens(Unary):
   def run(self, frame):
     return self.value.run(frame)
 
-
 @replaces(ast.Sub)
-class Sub(BinOp):
-  pass
-
+class Sub(BinOp): pass
 
 @replaces(ast.IfThen)
 class IfThen(ast.IfThen):
@@ -243,14 +242,10 @@ class AlwaysTrue(Leaf):
 def replace_nodes2(node, depth):
   if isinstance(node, ast.ShellCmd):
     return ShellCmd(node.value)
-  if isinstance(node, ast.RegEx):
-    return RegEx(node.value)
   if isinstance(node, ast.RegMatch):
     if isinstance(node.left, (Str, ast.Str)):
       return RegMatch(node.right, node.left)
     return RegMatch(node.left, node.right)
-  if isinstance(node, ast.Brackets):
-    return Array(node.value)
   return node
 
 
