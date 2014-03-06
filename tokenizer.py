@@ -54,11 +54,16 @@ def get_indent(s):
 
 def tokenize(raw):
   tokens = []
-  for l in raw.splitlines():
+  for i,l in enumerate(raw.splitlines(), 1):
     tokens += [DENT(get_indent(l))]
     ts, pos = PROGRAM.parse(l)
-    print(ts, pos)
-    assert len(l) == pos, "cannot parse %s at char %s" % (l, pos)
+    if len(l) != pos:
+      if pos > 5: ptr = "here {}┘".format("─"*(pos-4))
+      else:       ptr = " "*(pos+1) + "└─── error is somewhere here"
+      msg = "{msg}:\n\"{text}\"\n{ptr}\n" \
+            .format(msg="Cannot parse line %s"%i, text=l, ptr=ptr)
+      raise Exception(msg)
     tokens += ts
+
   log("after tokenizer:\n", tokens)
   return tokens
