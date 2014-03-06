@@ -57,7 +57,8 @@ def tokenize(raw):
   for l in raw.splitlines():
     tokens += [DENT(get_indent(l))]
     ts, pos = PROGRAM.parse(l)
-    # assert len(t) == pos, "cannot parse %s" % t
+    print(ts, pos)
+    assert len(l) == pos, "cannot parse %s at char %s" % (l, pos)
     tokens += ts
   log("after tokenizer:\n", tokens)
   return tokens
