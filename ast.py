@@ -19,11 +19,14 @@ class Node(list):
     super().__init__(args)
 
   def __getattr__(self, name):
-    assert name in self.fields, "Unknown field %s for %s" % (name, type(self))
+    if name not in self.fields:
+      raise AttributeError("Unknown attribute %s for %s (%s)" % (name, type(self), self.fields))
     idx = self.fields.index(name)
     return self[idx]
 
   def __setattr__(self, name, value):
+    if name not in self.fields:
+      raise AttributeError("Unknown attribute %s for %s (%s)" % (name, type(self), self.fields))
     idx = self.fields.index(name)
     self[idx] = value
 
