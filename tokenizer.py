@@ -26,19 +26,19 @@ END = EOL | (COMMENT+EOL)
 
 # IDENTIFIER (FUNCTION NAMES, VARIABLES, ETC)
 ID = RE(r'[A-Za-z_][a-zA-Z0-9_]*', Id)
-MATCH = SYMBOL('match', Match)
 
 # put longest operators first because for PEG first match wins
 operators = []
 for sym in sorted(symap.keys(), key=len, reverse=True):
   operators += [SYMBOL(sym, symap[sym])]
 OPERATOR = OR(*operators)
-PROGRAM = SOMEOF(CONST, OPERATOR, ID, MATCH, COMMENT) #+ END
+PROGRAM = SOMEOF(CONST, OPERATOR, ID, COMMENT) #+ END
 
 
 class DENT:
   def __init__(self, lvl):
     self.value = lvl
+
   def __repr__(self):
     return "DENT:%s" % self.value
 
