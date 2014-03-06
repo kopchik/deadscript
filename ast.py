@@ -154,6 +154,9 @@ class Sub(Binary): pass
 class Pow(Binary): pass
 
 @infix_r('=', 1)
+class Assign(Binary): pass
+
+@infix_r('==', 2)
 class Eq(Binary): pass
 
 @infix('<', 2)

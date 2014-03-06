@@ -38,15 +38,17 @@ class Value(Leaf):
 
 
 class BinOp(Binary):
+  same_type_operands = True
   def run(self, frame):
     opname = self.__class__.__name__
     left = self.left.run(frame)
     right = self.right.run(frame)
-    assert type(left) == type(right), \
+    if self.same_type_operands and type(left) != type(right):
+      raise Exception(
       "left and right values should have the same type," \
-      "got %s and %s insted" % (left, right)
+      "got %s and %s insted" % (left, right))
     assert hasattr(left, opname), \
-      "%s does not support %s operation" % (left, opname)
+      "%s (%s) does not support %s operation" % (left, type(left), opname)
     return getattr(left, opname)(right)
 
 
@@ -116,6 +118,9 @@ class Int(Value):
   def to_int(self):
     return self.value
 
+  def Eq(self, other):
+    return self.value == other.value
+
   def Sub(self, other):
     return Int(self.value-other.value)
 
@@ -168,19 +173,22 @@ class Var(Leaf):
     return frame[self.value]
 
 
-class Add(Binary):
-  def run(self, frame):
-    left = self.left.run(frame)
-    right = self.right.run(frame)
-    return left + right
+@replaces(ast.Add)
+class Add(BinOp):
+  pass
 
 
-@replaces(ast.Eq)
+@replaces(ast.Assign)
 class Assign(BinOp):
   def run(self, frame):
     value = self.right.run(frame)
     frame[str(self.left)] = value
     return value
+
+
+@replaces(ast.Eq)
+class Eq(BinOp):
+  pass
 
 
 @replaces(ast.Parens)
@@ -194,15 +202,21 @@ class Sub(BinOp):
   pass
 
 
+@replaces(ast.IfThen)
+class IfThen(ast.IfThen):
+  def run(self, frame):
+    if self.iff.run(frame):
+      self.then.run(frame)
+
+
 @replaces(ast.Subscript)
 class Subscript(BinOp):
-  pass
+  same_type_operands = False
+
 
 def replace_nodes2(node, depth):
   if isinstance(node, ast.Str):
     return Str(node.value)
-  if isinstance(node, ast.Add):
-    return Add(node.left, node.right)
   if isinstance(node, ast.Id):
     return Var(node.value)
   if isinstance(node, ast.ShellCmd):
@@ -228,7 +242,7 @@ def populate_top_frame(node, depth, frame):
   return node
 
 
-def run(ast, args=[]):
+def run(ast, args=['<progname>']):
   frame = Frame()
   ast = rewrite(ast, replace_nodes)
   ast = rewrite(ast, replace_nodes2)
