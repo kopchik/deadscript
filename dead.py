@@ -21,7 +21,8 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   logfilter.rules = [
-    ('interpreter.*', True)
+    ('interpreter.*', False),
+    ('indent.*', False)
   ]
 
   if args.debug: logfilter.default = True
@@ -42,5 +43,6 @@ if __name__ == '__main__':
     if args.ast:
       pretty_print(ast)
 
+    cmd = [args.input]+args.cmd
     # run the program
-    exit(run(ast, args.cmd))
+    exit(run(ast, cmd))
