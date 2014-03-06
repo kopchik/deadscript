@@ -78,17 +78,15 @@ class postfix:
     return cls
 
 
-class Value:
-  lbp = 0
-  sym = None
-  def __init__(self, value):
-    self.value = value
-  def nud(self):
-    return self
-  def __repr__(self):
-    cls = self.__class__.__name__
-    # return "(%s %s)" % (cls, self.value)
-    return "%s(%s)" % (cls, self.value)
+class action:
+  def __init__(self, sym):
+    self.sym = sym
+
+  def __call__(self, cls):
+    def nud(self):
+      return cls(self.sym)
+    symbol(self.sym).nud = nud
+    return cls
 
 
 class END:
