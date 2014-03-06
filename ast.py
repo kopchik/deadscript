@@ -2,7 +2,6 @@
 
 from pratt import prefix, infix, infix_r, postfix, brackets, \
   subscript, symap, parse as pratt_parse
-# from useful.mstring import s
 from log import Log
 log = Log('ast')
 
@@ -11,6 +10,13 @@ log = Log('ast')
 # TEMPLATES #
 #############
 class Node(list):
+  """ Base class for the most
+      syntax elements. It is a subclass of list
+      to support iteration over its elements.
+      It also supports access to the elements
+      through attributes. Names of attributes to
+      be specified in class.fields.
+  """
   fields = []
 
   def __init__(self, *args):
@@ -43,9 +49,13 @@ class Node(list):
 
 
 class Leaf:
+  """ Base class for AST elements that do not
+      support iteration over them.
+  """
   lbp = 0
   def __init__(self, value):
-    assert not hasattr(self, 'fields'), "Leaf cannot have fields attribute"
+    assert not hasattr(self, 'fields'), \
+      "Leaf subclass cannot have fields attribute (it's not Node)"
     self.value = value
     super().__init__()
 
@@ -65,7 +75,16 @@ class Binary(Node):
   fields = ['left', 'right']
 
 
+class Expr(Node):
+  """ It's an expression.
+  """
+  def __repr__(self):
+    return "Expr(%s)" % ", ".join(str(s) for s in self)
+
+
 class Block(Node):
+  """ It's block of one or more separate expressions.
+  """
   lbp = 1
   def nud(self):
     return self
@@ -77,11 +96,6 @@ class Block(Node):
   def __repr__(self):
     return "Block!(%s)" % ", ".join(str(t) for t in self)
   __str__ = __repr__
-
-
-class Expr(Node):
-  def __repr__(self):
-    return "Expr(%s)" % ", ".join(str(s) for s in self)
 
 
 ##############
@@ -205,22 +219,20 @@ def rewrite(tree, f, d=0, **kwargs):
   return tree
 
 
-# def precedence(ast):
-#   nodes = []
-#   for e in ast:
-#     if isinstance(e, Block) and e:
-#       expr = precedence(e)
-#       if isinstance(expr, Expr):
-#         expr = pratt_parse(expr)
-#       nodes.append(expr)
-#     else:
-#       nodes.append(e)
-#   return nodes
-
 def precedence(node, depth):
   if not isinstance(node, Expr):
     return node
   return pratt_parse(node)
+
+
+def func_args(node, depth):
+  """ Parses function arguments. """
+  if not isinstance(node, Lambda):
+    return node
+  argnames = node.args[0][0]  # TODO: why so many nested lists?
+  args = [Var(name.value) for name in argnames]
+  node.args = args
+  return node
 
 
 def pretty_print(ast, lvl=0):
@@ -235,21 +247,11 @@ def pretty_print(ast, lvl=0):
     print()
 
 
-def parse_args(node, depth):
-  if not isinstance(node, Lambda):
-    return node
-  argnames = node.args[0][0]  # TODO: why so many nested lists?
-  args = [Var(name.value) for name in argnames]
-  node.args = args
-  return node
-
-
 def parse(ast):
-  # ast = precedence(ast)
   ast = rewrite(ast, precedence)
   log.pratt("after pratt parser:\n", ast)
 
-  ast = rewrite(ast, parse_args)
-  log.rewrite("after rewriting func args:\n", ast)
+  ast = rewrite(ast, func_args)
+  log.rewrite("after parsing functions' args:\n", ast)
 
   return ast
