@@ -1,4 +1,5 @@
 from ast import Node, Binary, Leaf, rewrite
+from collections import OrderedDict
 from frame import Frame
 from log import Log
 import ast
@@ -8,14 +9,48 @@ import shlex
 import re
 
 log = Log("interpreter")
+astMap = OrderedDict()
 
 
+class replaces:
+  """ Decorator to substitute nodes in AST. """
+  def __init__(self, oldCls):
+    self.oldCls = oldCls
+
+  def __call__(self, newCls):
+    astMap[self.oldCls] = newCls
+    return newCls
+
+
+def replace_nodes(node, depth):
+    for oldCls, newCls in astMap.items():
+      if isinstance(node, oldCls):
+        log.replace("replacing %s (%s)" % (node, type(node)))
+        return newCls(*node)
+    return node
+
+
+class BinOp(Binary):
+  def run(self, frame):
+    opname = self.__class__.__name__
+    left = self.left(frame)
+    right = self.right(frame)
+    assert type(left) == type(right), \
+      "left and right values should have the same type,"
+      "got %s and %s insted" % (left, right)
+    assert hasattr(left, opname), \
+      "%s does not support %s operation" % (left, opname)
+    return getattr(left, opname)(right)
+
+
+@replaces(ast.Lambda)
 class Func(Node):
   fields = ['args', 'body']
   def run(self, frame):
     return self.body.run(frame)
 
 
+@replaces(ast.Block)
 class Block(Node):
   def run(self, frame):
     r = None
@@ -24,6 +59,8 @@ class Block(Node):
     return r
 
 
+#TODO: it's an unary operator
+@replaces(ast.Print)
 class Print(Node):
   fields = ['arg']
   def run(self, frame):
@@ -47,12 +84,12 @@ class RegEx(Leaf):
     return True
 
 
-class RegMatch(Node):
-  fields = ['left', 'right']
+class RegMatch(Binary):
   def run(self, frame):
     return self.left.match(self.right, frame)
 
 
+@replaces(ast.Int)
 class Int(Leaf):
   def __init__(self, value):
     self.value = int(value)
@@ -134,23 +171,21 @@ class Add(Binary):
     return left + right
 
 
-class Assign(Binary):
+@replaces(ast.Eq)
+class Assign(BinOp):
   def run(self, frame):
     value = self.right.run(frame)
     frame[str(self.left)] = value
     return value
 
 
-class Parens(ast.Parens):
+@replaces(ast.Parens)
+class Parens(Unrary):
   def run(self, frame):
     return self.value.run(frame)
 
-class Sub(ast.Sub):
-  def run(self, frame):
-    left = self.left.run(frame)
-    right = self.left.run(frame)
-    result = right.sub(left)
-    return result
+@replaces(ast.Sub)
+class Sub(BinOp): pass
 
 class Subscript(ast.Subscript):
   def run(self, frame):
@@ -158,19 +193,13 @@ class Subscript(ast.Subscript):
     var = self.left.run(frame)
     return var.subscript(idx)
 
-def replace_nodes(node, depth):
-  if isinstance(node, ast.Int):
-    return Int(node.value)
-  if isinstance(node, ast.Print):
-    return Print(node.value)
+def replace_nodes2(node, depth):
+  # if isinstance(node, ast.Int):
+  #   return Int(node.value)
   if isinstance(node, ast.Str):
     return Str(node.value)
-  if isinstance(node, ast.Lambda):
-    return Func(node.args, node.body)
   if isinstance(node, ast.Add):
     return Add(node.left, node.right)
-  if isinstance(node, ast.Parens):
-    return Parens(node.value)
   if isinstance(node, ast.Id):
     return Var(node.value)
   if isinstance(node, ast.ShellCmd):
@@ -181,16 +210,10 @@ def replace_nodes(node, depth):
     if isinstance(node.left, (Str, ast.Str)):
       return RegMatch(node.right, node.left)
     return RegMatch(node.left, node.right)
-  if isinstance(node, ast.Block):
-    return Block(*node)
   if isinstance(node, ast.Brackets):
     return Array(node.value)
-  if isinstance(node, ast.Eq):
-    return Assign(*node)
   if isinstance(node, ast.Subscript):
     return Subscript(*node)
-  if isinstance(node, ast.Sub):
-    return Sub(*node)
 
   return node
 
@@ -208,6 +231,7 @@ def populate_top_frame(node, depth, frame):
 def run(ast, args=[]):
   frame = Frame()
   ast = rewrite(ast, replace_nodes)
+  ast = rewrite(ast, replace_nodes2)
   log.final_ast("the final AST is:\n", ast)
 
   ast = rewrite(ast, populate_top_frame, frame=frame)
