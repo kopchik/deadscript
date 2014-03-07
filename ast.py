@@ -102,7 +102,7 @@ class Block(Node):
 # Data Types #
 ##############
 
-class Str(Leaf): pass
+class Str(Leaf):  pass
 class ShellCmd(Leaf):  pass
 class RegEx(Leaf):  pass
 class Int(Leaf):  pass
