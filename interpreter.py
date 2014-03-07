@@ -235,8 +235,8 @@ class Parens(Unary):
 
 @replaces(ast.IfThen)
 class IfThen(ast.IfThen):
-  def run(self, frame):
-    if self.iff.eval(frame):
+  def eval(self, frame):
+    if self.iff.eval(frame):  # this should return Bool
       return True, self.then.eval(frame)
     return False, 0
 
@@ -246,8 +246,9 @@ class Match(Unary):
   def eval(self, frame):
     for expr in self.arg:
       assert isinstance(expr, IfThen), \
-        "Child nodes of match operator can only be instances of IfThen"
-      match, result = expr.run(frame)
+        "Child nodes of match operator can" \
+        "only be instances of IfThen"
+      match, result = expr.eval(frame)
       if match:
         return result
 
