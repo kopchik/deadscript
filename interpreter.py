@@ -37,78 +37,10 @@ class Value(Leaf):
     return self
 
 
-class BinOp(Binary):
-  same_type_operands = True
-  def run(self, frame):
-    opname = self.__class__.__name__
-    left = self.left.run(frame)
-    right = self.right.run(frame)
-    if self.same_type_operands and type(left) != type(right):
-      raise Exception(
-      "left and right values should have the same type," \
-      "got %s and %s insted" % (left, right))
-    assert hasattr(left, opname), \
-      "%s (%s) does not support %s operation" % (left, type(left), opname)
-    return getattr(left, opname)(right)
-
-
-@replaces(ast.Lambda)
-class Func(Node):
-  fields = ['args', 'body']
-  def run(self, frame):
-    return self.body.run(frame)
-
-
-@replaces(ast.Block)
-class Block(Node):
-  def run(self, frame):
-    r = None
-    for e in self:
-      r = e.run(frame)
-    return r
-
-
-#TODO: it's an unary operator
-@replaces(ast.Print)
-class Print(Unary):
-  fields = ['arg']
-  def run(self, frame):
-    r = self.arg.run(frame)
-    print(r.to_string())
-    return self.arg
-
-
-@replaces(ast.RegEx)
-class RegEx(Leaf):
-  def match(self, string, frame):
-    expr = self.value[1:-1]
-    m = re.match(expr, str(string))
-    if not m:
-      return False
-    groupdict = m.groupdict()
-    if groupdict:
-      frame.update(groupdict)
-    group = m.group()
-    if group:
-      return Str(group)
-    return True
-
-
-class RegMatch(Binary):
-  def run(self, frame):
-    return self.left.match(self.right, frame)
-
-
 @replaces(ast.Int)
 class Int(Value):
   def __init__(self, value):
     self.value = int(value)
-
-  def __repr__(self):
-    return "\"%s\"" % self.value
-
-  def __str__(self):
-    return str(self.value)
 
   def to_string(self):
     return str(self)
@@ -152,7 +84,7 @@ class ShellCmd(Str):
 
 
 @replaces(ast.Brackets)
-class Array(Node):
+class Array(Value):
   def to_string(self, frame):
     #TODO: recursively call to_string
     return '[' + ", ".join(x.to_string() for x in self) + ']'
@@ -160,8 +92,25 @@ class Array(Node):
   def Subscript(self, idx):
     return self[idx.to_int()]
 
-  def run(self, frame):
-    return self
+
+class Bool(Value):
+  def to_string(self):
+    return str(self.value)
+
+
+@replaces(ast.RegEx)
+class RegEx(Value):
+  def RegMatch(self, string):
+    m = re.match(self.value, string.to_string())
+    if not m:
+      return Bool(False)
+    groupdict = m.groupdict()
+    if groupdict:
+      frame.update(groupdict) # TODO: frame not provided in args
+    group = m.group()
+    if group:
+      return Str(group)
+    return Bool(True)
 
 
 @replaces(ast.Id)
@@ -174,6 +123,58 @@ class Var(Leaf):
       return frame[self.value]
     except KeyError:
       raise Exception("unknown variable \"%s\"" % self.value)
+
+
+class BinOp(Binary):
+  same_type_operands = True
+  def run(self, frame):
+    opname = self.__class__.__name__
+    left = self.left.run(frame)
+    right = self.right.run(frame)
+    if self.same_type_operands and type(left) != type(right):
+      raise Exception(
+      "left and right values should have the same type," \
+      "got %s and %s insted" % (left, right))
+    assert hasattr(left, opname), \
+      "%s (%s) does not support %s operation" % (left, type(left), opname)
+    return getattr(left, opname)(right)
+
+
+@replaces(ast.Lambda)
+class Func(Node):
+  fields = ['args', 'body']
+  def run(self, frame):
+    return self.body.run(frame)
+
+
+@replaces(ast.Block)
+class Block(Node):
+  def run(self, frame):
+    r = None
+    for e in self:
+      r = e.run(frame)
+    return r
+
+
+#TODO: it's an unary operator
+@replaces(ast.Print)
+class Print(Unary):
+  fields = ['arg']
+  def run(self, frame):
+    r = self.arg.run(frame)
+    print(r.to_string())
+    return self.arg
+
+
+@replaces(ast.RegMatch)
+class RegMatch(BinOp):
+  same_type_operands = False
+  def __init__(self, left, right):
+    if isinstance(left, (Str, ast.Str)):
+      left, right = right, left
+    super().__init__(left, right)
+
+
 
 
 @replaces(ast.Add)
@@ -230,14 +231,6 @@ class AlwaysTrue(Leaf):
     return True
 
 
-def replace_nodes2(node, depth):
-  if isinstance(node, ast.RegMatch):
-    if isinstance(node.left, (Str, ast.Str)):
-      return RegMatch(node.right, node.left)
-    return RegMatch(node.left, node.right)
-  return node
-
-
 def populate_top_frame(node, depth, frame):
   if depth == 0 and isinstance(node, Assign):
     key   = str(node.left)
@@ -249,7 +242,6 @@ def populate_top_frame(node, depth, frame):
 def run(ast, args=['<progname>']):
   frame = Frame()
   ast = rewrite(ast, replace_nodes)
-  ast = rewrite(ast, replace_nodes2)
   log.final_ast("the final AST is:\n", ast)
 
   ast = rewrite(ast, populate_top_frame, frame=frame)
