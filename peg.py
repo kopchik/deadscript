@@ -24,7 +24,7 @@ class RE(Grammar):
   def __init__(self, pattern, token=str, comment=None, passval=True):
     self.pattern_orig = pattern
     self.pattern = re.compile("\s*(%s)\s*" % pattern)
-    self.token = token
+    self.token   = token
     self.comment = comment
     self.passval = passval
 
@@ -32,7 +32,7 @@ class RE(Grammar):
     m = self.pattern.match(text[pos:])
     if not m:
       raise NoMatch("syntax error", text, pos)
-    text = m.groups()[0]
+    text = m.groups()[-1]
     newpos = pos+m.end()
     if self.passval:
       return self.token(text), newpos
