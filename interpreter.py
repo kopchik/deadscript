@@ -267,10 +267,10 @@ class Call0(Unary):
 
 
 def run(ast, args=['<progname>']):
-  frame = Frame()
   ast = rewrite(ast, replace_nodes)
   log.final_ast("the final AST is:\n", ast)
 
+  frame = Frame()
   ast.eval(frame)
   log.topframe("the top frame is\n", frame)
 
