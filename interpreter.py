@@ -74,7 +74,7 @@ class Print(Unary):
   fields = ['arg']
   def run(self, frame):
     r = self.arg.run(frame)
-    print(r.to_string(frame))
+    print(r.to_string())
     return self.arg
 
 
@@ -110,7 +110,7 @@ class Int(Value):
   def __str__(self):
     return str(self.value)
 
-  def to_string(self, frame):
+  def to_string(self):
     return str(self)
 
   def to_int(self):
@@ -128,43 +128,34 @@ class Int(Value):
   def Mul(self, other):
     return Int(self.value*other.value)
 
-  def run(self, frame):
-    return self
-
 
 @replaces(ast.Str)
-class Str(ast.Leaf):
-  def __str__(self):
-    return self.value[1:-1]
-
-  def to_string(self, frame):
+class Str(Value):
+  def to_string(self):
+    string = self.value
     replace = {r'\n': '\n', r'\t': '\t'}
-    string = self.value.strip('"')
     varnames = re.findall("\{([a-zA-Z\.]+)\}", string, re.M)
     for name in varnames:
-        value = Var(name).run(frame).to_string(frame)
+        value = Var(name).run(frame).to_string()
         string = string.replace("{%s}" % name, value)
     for k,v in replace.items():
       string = string.replace(k, v)
     return string
 
-  def run(self, frame):
-    return self
 
-
+@replaces(ast.ShellCmd)
 class ShellCmd(Str):
   def run(self, frame):
-    cmd = super().run(frame)
-    cmd = cmd.strip('`')
+    cmd = super().run(frame).to_string()
     raw = check_output(shlex.split(cmd))
-    return raw.decode()
+    return Str(raw.decode())
 
 
 @replaces(ast.Brackets)
 class Array(Node):
   def to_string(self, frame):
     #TODO: recursively call to_string
-    return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
+    return '[' + ", ".join(x.to_string() for x in self) + ']'
 
   def Subscript(self, idx):
     return self[idx.to_int()]
@@ -240,8 +231,6 @@ class AlwaysTrue(Leaf):
 
 
 def replace_nodes2(node, depth):
-  if isinstance(node, ast.ShellCmd):
-    return ShellCmd(node.value)
   if isinstance(node, ast.RegMatch):
     if isinstance(node.left, (Str, ast.Str)):
       return RegMatch(node.right, node.left)
