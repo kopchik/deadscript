@@ -43,7 +43,7 @@ class Int(Value):
     self.value = int(value)
 
   def to_string(self, frame):
-    return str(self)
+    return str(self.value)
 
   def to_int(self):
     return self.value
