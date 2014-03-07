@@ -52,13 +52,22 @@ class Int(Value):
     return Int(self.value + right.value)
 
   def Eq(self, other):
-    return self.value == other.value
+    return Bool(self.value == other.value)
+
+  def Less(self, other):
+    return Bool(self.value < other.value)
+
+  def More(self, other):
+    return Bool(self.value > other.value)
 
   def Sub(self, other):
     return Int(self.value-other.value)
 
   def Mul(self, other):
     return Int(self.value*other.value)
+
+  def Pow(self, other):
+    return Int(self.value**other.value)
 
 
 @replaces(ast.Str)
@@ -189,6 +198,14 @@ class Print(Unary):
     print(r.to_string(frame))
     return r
 
+@replaces(ast.Assert)
+class Assert(Unary):
+  def eval(self, frame):
+    r = self.arg.eval(frame)
+    if not r:
+      raise Exception("Assertion failed on %s" % self.arg)
+    return r
+
 
 @replaces(ast.RegMatch)
 class RegMatch(BinOp):
@@ -197,8 +214,6 @@ class RegMatch(BinOp):
     if isinstance(left, (Str, ast.Str)):
       left, right = right, left
     super().__init__(left, right)
-
-
 
 
 @replaces(ast.Add)
@@ -219,8 +234,17 @@ class Assign(BinOp):
 @replaces(ast.Eq)
 class Eq(BinOp): pass
 
+@replaces(ast.Less)
+class Less(BinOp): pass
+
+@replaces(ast.More)
+class More(BinOp): pass
+
 @replaces(ast.Sub)
 class Sub(BinOp): pass
+
+@replaces(ast.Pow)
+class Pow(BinOp): pass
 
 @replaces(ast.Subscript)
 class Subscript(BinOp):
