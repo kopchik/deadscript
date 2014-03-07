@@ -77,8 +77,8 @@ class Str(Value):
 
 @replaces(ast.ShellCmd)
 class ShellCmd(Str):
-  def run(self, frame):
-    cmd = super().run(frame).to_string(frame)
+  def eval(self, frame):
+    cmd = super().eval(frame).to_string(frame)
     raw = check_output(shlex.split(cmd))
     return Str(raw.decode())
 
@@ -229,8 +229,8 @@ class Subscript(BinOp):
 
 @replaces(ast.Parens)
 class Parens(Unary):
-  def run(self, frame):
-    return self.arg.run(frame)
+  def eval(self, frame):
+    return self.arg.eval(frame)
 
 
 @replaces(ast.IfThen)
