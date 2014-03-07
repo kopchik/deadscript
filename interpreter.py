@@ -33,7 +33,7 @@ def replace_nodes(node, depth):
 
 
 class Value(Leaf):
-  def run(self, frame):
+  def eval(self, frame):
     return self
 
 
@@ -42,7 +42,7 @@ class Int(Value):
   def __init__(self, value):
     self.value = int(value)
 
-  def to_string(self):
+  def to_string(self, frame):
     return str(self)
 
   def to_int(self):
@@ -63,12 +63,12 @@ class Int(Value):
 
 @replaces(ast.Str)
 class Str(Value):
-  def to_string(self):
+  def to_string(self, frame):
     string = self.value
     replace = {r'\n': '\n', r'\t': '\t'}
     varnames = re.findall("\{([a-zA-Z\.]+)\}", string, re.M)
     for name in varnames:
-        value = Var(name).run(frame).to_string()
+        value = Var(name).eval(frame).to_string(frame)
         string = string.replace("{%s}" % name, value)
     for k,v in replace.items():
       string = string.replace(k, v)
@@ -78,7 +78,7 @@ class Str(Value):
 @replaces(ast.ShellCmd)
 class ShellCmd(Str):
   def run(self, frame):
-    cmd = super().run(frame).to_string()
+    cmd = super().run(frame).to_string(frame)
     raw = check_output(shlex.split(cmd))
     return Str(raw.decode())
 
@@ -87,21 +87,24 @@ class ShellCmd(Str):
 class Array(Value):
   def to_string(self, frame):
     #TODO: recursively call to_string
-    return '[' + ", ".join(x.to_string() for x in self) + ']'
+    return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
 
   def Subscript(self, idx):
     return self[idx.to_int()]
 
 
 class Bool(Value):
-  def to_string(self):
+  def __bool__(self):
+    return self.value
+
+  def to_string(self, frame):
     return str(self.value)
 
 
 @replaces(ast.RegEx)
 class RegEx(Value):
   def RegMatch(self, string):
-    m = re.match(self.value, string.to_string())
+    m = re.match(self.value, string.to_string(frame))
     if not m:
       return Bool(False)
     groupdict = m.groupdict()
@@ -118,7 +121,11 @@ class Var(Leaf):
   def __str__(self):
     return str(self.value)
 
-  def run(self, frame):
+  def Assign(self, value, frame):
+    # self.value actually holds the name
+    frame[self.value] = value
+
+  def eval(self, frame):
     try:
       return frame[self.value]
     except KeyError:
@@ -127,10 +134,10 @@ class Var(Leaf):
 
 class BinOp(Binary):
   same_type_operands = True
-  def run(self, frame):
+  def eval(self, frame):
     opname = self.__class__.__name__
-    left = self.left.run(frame)
-    right = self.right.run(frame)
+    left = self.left.eval(frame)
+    right = self.right.eval(frame)
     if self.same_type_operands and type(left) != type(right):
       raise Exception(
       "left and right values should have the same type," \
@@ -143,26 +150,43 @@ class BinOp(Binary):
 @replaces(ast.Lambda)
 class Func(Node):
   fields = ['args', 'body']
-  def run(self, frame):
-    return self.body.run(frame)
+
+  # def Assign(self, frame):
+  #   return self
+
+  def Call(self, frame):
+    return self.body.eval(frame)
+
+  def eval(self, frame):
+    return self
+
+
+@replaces(ast.Lambda0)
+class Func0(Node):
+  fields = ['body']
+
+  def Call(self, frame):
+    return self.body.eval(frame)
+
+  def eval(self, frame):
+    return self
 
 
 @replaces(ast.Block)
 class Block(Node):
-  def run(self, frame):
+  def eval(self, frame):
     r = None
     for e in self:
-      r = e.run(frame)
+      r = e.eval(frame)
     return r
 
 
-#TODO: it's an unary operator
 @replaces(ast.Print)
 class Print(Unary):
   fields = ['arg']
-  def run(self, frame):
-    r = self.arg.run(frame)
-    print(r.to_string())
+  def eval(self, frame):
+    r = self.arg.eval(frame)
+    print(r.to_string(frame))
     return self.arg
 
 
@@ -185,38 +209,41 @@ class Mul(BinOp): pass
 
 @replaces(ast.Assign)
 class Assign(BinOp):
-  def run(self, frame):
-    value = self.right.run(frame)
-    frame[str(self.left)] = value
+  def eval(self, frame):
+    value = self.right.eval(frame)
+    # TODO: lvalue should be a valid ID
+    self.left.Assign(value, frame)
     return value
+
 
 @replaces(ast.Eq)
 class Eq(BinOp): pass
 
-@replaces(ast.Parens)
-class Parens(Unary):
-  def run(self, frame):
-    return self.arg.run(frame)
-
 @replaces(ast.Sub)
 class Sub(BinOp): pass
-
-@replaces(ast.IfThen)
-class IfThen(ast.IfThen):
-  def run(self, frame):
-    if self.iff.run(frame):
-      return True, self.then.run(frame)
-    return False, 0
-
 
 @replaces(ast.Subscript)
 class Subscript(BinOp):
   same_type_operands = False
 
 
+@replaces(ast.Parens)
+class Parens(Unary):
+  def run(self, frame):
+    return self.arg.run(frame)
+
+
+@replaces(ast.IfThen)
+class IfThen(ast.IfThen):
+  def run(self, frame):
+    if self.iff.eval(frame):
+      return True, self.then.eval(frame)
+    return False, 0
+
+
 @replaces(ast.Match)
 class Match(Unary):
-  def run(self, frame):
+  def eval(self, frame):
     for expr in self.arg:
       assert isinstance(expr, IfThen), \
         "Child nodes of match operator can only be instances of IfThen"
@@ -226,17 +253,16 @@ class Match(Unary):
 
 
 @replaces(ast.AlwaysTrue)
-class AlwaysTrue(Leaf):
-  def run(self, frame):
-    return True
+class AlwaysTrue(Value):
+  def Bool(self, frame):
+    return Bool(True)
 
 
-def populate_top_frame(node, depth, frame):
-  if depth == 0 and isinstance(node, Assign):
-    key   = str(node.left)
-    value = node.right
-    frame[key] = value
-  return node
+@replaces(ast.Call0)
+class Call0(Unary):
+  def eval(self, frame):
+    func = self.arg.eval(frame)
+    return func.Call(frame)
 
 
 def run(ast, args=['<progname>']):
@@ -244,7 +270,7 @@ def run(ast, args=['<progname>']):
   ast = rewrite(ast, replace_nodes)
   log.final_ast("the final AST is:\n", ast)
 
-  ast = rewrite(ast, populate_top_frame, frame=frame)
+  ast.eval(frame)
   log.topframe("the top frame is\n", frame)
 
   if 'main' not in frame:
@@ -252,7 +278,6 @@ def run(ast, args=['<progname>']):
     return
 
   with frame as newframe:
-    func = newframe['main']
     newframe['argc'] = Int(len(args))
-    newframe['argv'] = Array(*map(Str,args))
-    func.run(newframe)
+    newframe['argv'] = Array(*map(Str, args))
+    newframe['main'].Call(newframe)
