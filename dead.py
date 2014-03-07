@@ -21,8 +21,8 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   logfilter.rules = [
-    ('interpreter.*', False),
-    ('indent.*', False)
+    # ('interpreter.*', False),
+    # ('indent.*', False)
   ]
 
   if args.debug: logfilter.default = True
