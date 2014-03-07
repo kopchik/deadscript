@@ -70,7 +70,7 @@ class Block(Node):
 
 #TODO: it's an unary operator
 @replaces(ast.Print)
-class Print(Node):
+class Print(Unary):
   fields = ['arg']
   def run(self, frame):
     r = self.arg.run(frame)
@@ -204,7 +204,7 @@ class Eq(BinOp): pass
 @replaces(ast.Parens)
 class Parens(Unary):
   def run(self, frame):
-    return self.value.run(frame)
+    return self.arg.run(frame)
 
 @replaces(ast.Sub)
 class Sub(BinOp): pass
@@ -225,7 +225,7 @@ class Subscript(BinOp):
 @replaces(ast.Match)
 class Match(Unary):
   def run(self, frame):
-    for expr in self.value:
+    for expr in self.arg:
       assert isinstance(expr, IfThen), \
         "Child nodes of match operator can only be instances of IfThen"
       match, result = expr.run(frame)
