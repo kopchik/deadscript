@@ -5,7 +5,7 @@ from log import Log
 log = Log("tokenizer")
 
 # CONSTANTS
-FLOATCONST = RE(r'[-]{0,1}\d+\.\d*', comment="FLOAT")
+FLOATCONST = RE(r'[-]{0,1}\d+\.\d*')
 INTCONST   = RE(r'[-]{0,1}\d+', Int)
 STRCONST   = RE(r'"(.*)"', Str)
 SHELLCMD   = RE(r'`(.*)`', ShellCmd)
@@ -21,7 +21,7 @@ COMMENT = SHELLCOMMENT | CCOMMENT | CPPCOMMENT
 # TODO: add this to PROG
 # END is like ENDL (end of line)
 # but allows trailing comments
-EOL = RE(r'$', comment="EOL")  # end of line
+EOL = RE(r'$')  # end of line
 END = EOL | (COMMENT+EOL)
 
 # IDENTIFIER (FUNCTION NAMES, VARIABLES, ETC)
