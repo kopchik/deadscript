@@ -21,11 +21,10 @@ class Grammar:
 
 
 class RE(Grammar):
-  def __init__(self, pattern, token=str, comment=None, passval=True):
+  def __init__(self, pattern, token=str, passval=True):
     self.pattern_orig = pattern
-    self.pattern = re.compile("\s*(%s)\s*" % pattern)
+    self.pattern = re.compile("\s*(%s)" % pattern)
     self.token   = token
-    self.comment = comment
     self.passval = passval
 
   def parse(self, text, pos=0):
@@ -40,8 +39,6 @@ class RE(Grammar):
       return self.token(), newpos
 
   def __repr__(self):
-    if self.comment:
-      return self.comment
     cls = self.__class__.__name__
     return "%s(\"%s\", %s)" % (cls, self.pattern_orig, self.token)
 
