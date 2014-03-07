@@ -232,7 +232,7 @@ def precedence(node, depth):
   try:
     return pratt_parse(node)
   except Exception as err:
-    raise Exception("cannot process expression %s" % node) from Exception
+    raise Exception("cannot process expression %s (%s)" % (node, err)) from Exception
 
 def func_args(node, depth):
   """ Parses function arguments. """
