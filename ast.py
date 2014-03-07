@@ -98,6 +98,7 @@ class Block(Node):
   __str__ = __repr__
 
 
+class Comment(Leaf): pass
 ##############
 # Data Types #
 ##############

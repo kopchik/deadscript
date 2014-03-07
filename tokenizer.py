@@ -1,5 +1,5 @@
-from peg import RE, SOMEOF, MAYBE, OR, SYMBOL
-from ast import symap, Id, Match, Int, Str, ShellCmd, RegEx
+from peg import RE, SOMEOF, MAYBE, OR, SYMBOL, NoMatch
+from ast import symap, Id, Match, Int, Str, ShellCmd, RegEx, Comment
 from log import Log
 
 log = Log("tokenizer")
@@ -13,9 +13,9 @@ REGEX      = RE(r'/(.*)/', RegEx)
 CONST = FLOATCONST | INTCONST | STRCONST | SHELLCMD | REGEX
 
 # COMMENTS
-SHELLCOMMENT = RE(r'\#.*')
-CPPCOMMENT   = RE(r'//.*')
-CCOMMENT     = RE(r'/\*.*?\*/')
+SHELLCOMMENT = RE(r'\#.*', Comment)
+CPPCOMMENT   = RE(r'//.*', Comment)
+CCOMMENT     = RE(r'/\*.*?\*/', Comment)
 COMMENT = SHELLCOMMENT | CCOMMENT | CPPCOMMENT
 
 # TODO: add this to PROG
@@ -32,7 +32,7 @@ operators = []
 for sym in sorted(symap.keys(), key=len, reverse=True):
   operators += [SYMBOL(sym, symap[sym])]
 OPERATOR = OR(*operators)
-PROGRAM = SOMEOF(CONST, OPERATOR, ID, COMMENT) #+ END
+PROGRAM = SOMEOF(COMMENT, CONST, OPERATOR, ID) #+ END
 
 
 class DENT:
@@ -55,8 +55,13 @@ def get_indent(s):
 def tokenize(raw):
   tokens = []
   for i,l in enumerate(raw.splitlines(), 1):
+    if not l:
+      continue
     tokens += [DENT(get_indent(l))]
-    ts, pos = PROGRAM.parse(l)
+    try:
+      ts, pos = PROGRAM.parse(l)
+    except NoMatch:
+      raise Exception("cannot parse string:\n%s"%l)
     if len(l) != pos:
       if pos > 5: ptr = "here {}┘".format("─"*(pos-4))
       else:       ptr = " "*(pos+1) + "└─── error is somewhere here"

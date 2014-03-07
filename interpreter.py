@@ -266,6 +266,12 @@ class Call0(Unary):
     return func.Call(frame)
 
 
+@replaces(ast.Comment)
+class Comment(Value):
+  def eval(self, frame):
+    pass
+
+
 def run(ast, args=['<progname>']):
   ast = rewrite(ast, replace_nodes)
   log.final_ast("the final AST is:\n", ast)
