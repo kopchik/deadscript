@@ -68,7 +68,7 @@ class Leaf:
 
 
 class Unary(Node):
-  fields = ['value']
+  fields = ['arg']
 
 
 class Binary(Node):
@@ -114,12 +114,10 @@ class Id(Leaf): pass
 ###########
 
 @prefix('p', 0)
-class Print(Unary):
-  pass
+class Print(Unary): pass
 
 @action('_')
-class AlwaysTrue(Leaf):
-  pass
+class AlwaysTrue(Leaf): pass
 
 
 #########
