@@ -187,7 +187,7 @@ class Print(Unary):
   def eval(self, frame):
     r = self.arg.eval(frame)
     print(r.to_string(frame))
-    return self.arg
+    return r
 
 
 @replaces(ast.RegMatch)
