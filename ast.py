@@ -137,7 +137,7 @@ class Match(Node): pass
 class Lambda0(Unary): pass
 
 @postfix('!', 3)
-class CALL(Unary): pass
+class Call0(Unary): pass
 
 
 ##########
@@ -218,6 +218,7 @@ class Var(Leaf):
 #######################
 
 def rewrite(tree, f, d=0, **kwargs):
+  if d==0: tree = f(tree, d, **kwargs)  # TODO: is this a dirty hack?
   for i,n in enumerate(tree):
       if isinstance(n, Node):
         n = rewrite(n, f, d+1, **kwargs)
