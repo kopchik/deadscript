@@ -1,4 +1,4 @@
-from ast import Node, Unary, Binary, Leaf, rewrite
+from ast import Node, ListNode, Unary, Binary, Leaf, rewrite
 from collections import OrderedDict
 from frame import Frame
 from log import Log
@@ -92,15 +92,27 @@ class ShellCmd(Str):
     return Str(raw.decode())
 
 
+class ReturnException(Exception):  pass
+@replaces(ast.Return)
+class Return(Leaf):
+  def eval(self, frame):
+    raise ReturnException
+
+
 @replaces(ast.Brackets)
-class Array(Value):
+class Array(ListNode):
+  def __init__(self, args):
+    super().__init__(*args)
+
   def to_string(self, frame):
-    #TODO: recursively call to_string
-    return '[' + ", ".join(x.to_string(frame) for x in self) + ']'
+    values = [x.eval(frame).to_string(frame) for x in self]
+    return '[' + ", ".join(values) + ']'
 
   def Subscript(self, idx):
     return self[idx.to_int()]
 
+  def eval(self, frame):
+    return self
 
 class Bool(Value):
   def __bool__(self):
@@ -149,8 +161,8 @@ class BinOp(Binary):
     right = self.right.eval(frame)
     if self.same_type_operands and type(left) != type(right):
       raise Exception("%s:" \
-      "left and right values should have the same type," \
-      "got %s and %s insted" % (self.__class__, left, right))
+      "left and right values should have the same type, " \
+      "got\n %s and\n %s instead" % (self.__class__, left, right))
     assert hasattr(left, opname), \
       "%s (%s) does not support %s operation" % (left, type(left), opname)
     return getattr(left, opname)(right)
