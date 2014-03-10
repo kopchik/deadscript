@@ -134,9 +134,12 @@ Useful Links
 1. http://roscidus.com/blog/blog/2013/06/20/replacing-python-round-2/#syntax
 1. http://en.wikipedia.org/wiki/Linear_type_system
 
-CODING GUIDELINES
-=================
 
-property? -- boolean property
+Types
+=====
 
-Functions should either return a value or raise exception.
+Str
+Int
+Bool
+Tuple
+Array

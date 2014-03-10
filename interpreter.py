@@ -148,9 +148,9 @@ class BinOp(Binary):
     left = self.left.eval(frame)
     right = self.right.eval(frame)
     if self.same_type_operands and type(left) != type(right):
-      raise Exception(
+      raise Exception("%s:" \
       "left and right values should have the same type," \
-      "got %s and %s insted" % (left, right))
+      "got %s and %s insted" % (self.__class__, left, right))
     assert hasattr(left, opname), \
       "%s (%s) does not support %s operation" % (left, type(left), opname)
     return getattr(left, opname)(right)
@@ -286,14 +286,45 @@ class AlwaysTrue(Value):
 @replaces(ast.Call0)
 class Call0(Unary):
   def eval(self, frame):
-    func = self.arg.eval(frame)
-    return func.Call(frame)
+    with frame as newframe:
+      func = self.arg.eval(newframe)
+      return func.Call(newframe)
+
+
+@replaces(ast.Call)
+class Call(Binary):
+  fields = ['func', 'args']
+  def eval(self, frame):
+    with frame as newframe:
+      func = self.func.eval(frame)
+      args = self.args.eval(frame)
+      if isinstance(args, (Value, Var)):
+        """ this is just to be able to iterate over func
+            args
+        """
+        args = [args]
+      assert len(func.args) == len(args)
+      for k, v in zip(func.args, args):
+        if isinstance(v, ast.Int): v = Int(v.value) # dirty hack to overcome parser bug
+        newframe[k.value] = v
+      return func.Call(newframe)
 
 
 @replaces(ast.Comment)
 class Comment(Value):
   def eval(self, frame):
     pass
+
+
+@replaces(ast.ComposeR)
+class ComposeR(Binary):
+  def eval(self, frame):
+    right = self.right.eval(frame)
+    left = self.left.eval(frame)
+    print("left", self.left)
+    print("right", self.right)
+    print(type(frame)) #TODO: doesn't work
+    return Call(left, right).eval(frame)
 
 
 def run(ast, args=['<progname>']):
@@ -306,9 +337,12 @@ def run(ast, args=['<progname>']):
 
   if 'main' not in frame:
     print("no main function defined, exiting")
-    return
+    return 0
 
   with frame as newframe:
     newframe['argc'] = Int(len(args))
-    newframe['argv'] = Array(*map(Str, args))
-    newframe['main'].Call(newframe)
+    newframe['argv'] = Array(map(Str, args))
+    r = newframe['main'].Call(newframe)
+
+  if isinstance(r, Int): return r.to_int()
+  else:                  return 0

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pratt import prefix, infix, infix_r, postfix, brackets, \
-  subscript, action, symap, parse as pratt_parse
+  subscript, action, symap, parse as pratt_parse, expr
 from log import Log
 log = Log('ast')
 
@@ -9,13 +9,13 @@ log = Log('ast')
 #############
 # TEMPLATES #
 #############
+
 class Node(list):
-  """ Base class for the most
-      syntax elements. It is a subclass of list
-      to support iteration over its elements.
-      It also supports access to the elements
-      through attributes. Names of attributes to
-      be specified in class.fields.
+  """
+  Base class for most syntax elements. It is a subclass of
+  list to support iteration over its elements. It also
+  supports access to the elements through attributes. Names
+  of attributes to be specified in class.fields.
   """
   fields = []
 
@@ -48,20 +48,25 @@ class Node(list):
     return "%s(%s)" % (cls, args)
 
 
+class ListNode(Node):
+  """ Represents a node that is just a list of something. """
+  fields = None
+
+
 class Leaf:
-  """ Base class for AST elements that do not
-      support iteration over them.
+  """ Base class for AST elements that do not support
+      iteration over them.
   """
   lbp = 0
   def __init__(self, value):
     assert not hasattr(self, 'fields'), \
-      "Leaf subclass cannot have fields attribute (it's not Node)"
+      "Leaf subclass cannot have fields attribute (it's not a Node)"
     self.value = value
     super().__init__()
 
   def __repr__(self):
     cls = self.__class__.__name__
-    return "%s:%s" % (cls, self.value)
+    return "%s(%s)" % (cls, self.value)
 
   def nud(self):
     return self
@@ -76,22 +81,16 @@ class Binary(Node):
 
 
 class Expr(Node):
-  """ It's an expression.
-  """
+  """ It's an expression. """
   def __repr__(self):
     return "Expr(%s)" % ", ".join(str(s) for s in self)
 
 
 class Block(Node):
-  """ It's block of one or more separate expressions.
-  """
+  """ A block of one or more expressions. """
   # lbp = 1
   def nud(self):
     return self
-
-  # def led(self, left):
-  #   print("LEFT:", left)
-  #   return self
 
   def __repr__(self):
     return "Block!(%s)" % ", ".join(str(t) for t in self)
@@ -99,6 +98,8 @@ class Block(Node):
 
 
 class Comment(Leaf): pass
+
+
 ##############
 # Data Types #
 ##############
@@ -107,15 +108,19 @@ class Str(Leaf):  pass
 class ShellCmd(Leaf):  pass
 class RegEx(Leaf):  pass
 class Int(Leaf):  pass
-class Id(Leaf): pass
+class Id(Leaf):  pass
 
 
 ###########
 # SPECIAL #
 ###########
 
-@prefix('p', 0)
+@prefix('p ', 0)
 class Print(Unary): pass
+
+@prefix('assert', 0)
+class Assert(Unary): pass
+
 
 @action('_')
 class AlwaysTrue(Leaf): pass
@@ -144,6 +149,11 @@ class Call0(Unary): pass
 ##########
 # BINARY #
 ##########
+@infix_r(' . ', 8)
+class ComposeR(Binary): pass
+
+@infix('$', 8)
+class ComposerL(Binary): pass
 
 @infix('+', 10)
 class Add(Binary): pass
@@ -181,7 +191,7 @@ class Lambda(Binary):
   fields = ['args', 'body']
 
 @brackets('(',')')
-class Parens(Unary): pass
+class Parens(ListNode): pass
 
 @brackets('[',']')
 class Brackets(Unary): pass
@@ -189,11 +199,14 @@ class Brackets(Unary): pass
 @subscript('[', ']', -1000)
 class Subscript(Binary): pass
 
-@infix(',', 1)
-class Comma(Node):
-  fields = None
-  """ Two and more commas in a row
-      will be merged into one.
+@infix_r('@', 4)
+class Call(Binary): pass
+
+
+@infix(',', 5)
+class Comma(ListNode):
+  """ Parses comma-separated values. It flattens the list,
+      e.g., Comma(1, Comma(2, 3)) transformed into Comma(1, 2, 3).
   """
   def __init__(self, left, right):
     values = []
@@ -201,7 +214,7 @@ class Comma(Node):
       values += left + [right]
     else:
       values = [left, right]
-    super().__init__(values)
+    super().__init__(*values)
 
   def __repr__(self):
     cls = self.__class__.__name__
@@ -219,6 +232,9 @@ class Var(Leaf):
 #######################
 
 def rewrite(tree, f, d=0, **kwargs):
+  """ Generic function to transform AST. It reqursively
+      applies function to all elements of the tree.
+  """
   if d==0: tree = f(tree, d, **kwargs)  # TODO: is this a dirty hack?
   for i,n in enumerate(tree):
       if isinstance(n, Node):
@@ -228,6 +244,7 @@ def rewrite(tree, f, d=0, **kwargs):
 
 
 def precedence(node, depth):
+  """ Parses operator precedence """
   if not isinstance(node, Expr):
     return node
   try:
@@ -235,17 +252,25 @@ def precedence(node, depth):
   except Exception as err:
     raise Exception("cannot process expression %s (%s)" % (node, err)) from Exception
 
-def func_args(node, depth):
+
+def func_args(func, depth):
   """ Parses function arguments. """
-  if not isinstance(node, Lambda):
-    return node
-  argnames = node.args[0][0]  # TODO: why so many nested lists?
-  args = [Var(name.value) for name in argnames]
-  node.args = args
-  return node
+  if not isinstance(func, Lambda):
+    return func
+  assert len(func.args) == 1, \
+    "function arguments should be in parentheses and separated by commas"
+  args = func.args[0]
+  assert isinstance(args, (Comma, Id)), \
+    "function argument can be a single ID or some IDs separated by commas"
+  if isinstance(args, Id):
+    args = [args]
+  args = [Var(name.value) for name in args]
+  func.args = args
+  return func
 
 
 def pretty_print(ast, lvl=0):
+  """ Prints AST in a more or less readable form """
   prefix = " "*lvl
   for e in ast:
     if isinstance(e, Node):
@@ -257,11 +282,32 @@ def pretty_print(ast, lvl=0):
     print()
 
 
+def implicit_calls(expr, depth):
+  """ Adds "implicit" calls. E.g., expression "a b c" will
+      be parsed as "a(b(c))". This is done by inserting
+      explicit call operator.
+  """
+  if not isinstance(expr, Expr):
+    return expr
+  if len(expr) < 2:
+    return expr
+  result = Expr()
+  prev, nxt = None, None
+  for i,nxt in enumerate(expr):
+    if isinstance(prev, Id) and isinstance(nxt, (Int,Id)):
+      result.append(symap['@']())
+    result.append(nxt)
+    prev = nxt
+  return result
+
+
 def parse(ast):
+  ast = rewrite(ast, implicit_calls)
+  log.implicit_calls(ast)
   ast = rewrite(ast, precedence)
   log.pratt("after pratt parser:\n", ast)
 
   ast = rewrite(ast, func_args)
-  log.rewrite("after parsing functions' args:\n", ast)
-
+  # log.rewrite("after parsing functions' args:\n", ast)
+  # pretty_print(ast)
   return ast
