@@ -154,7 +154,7 @@ class Plus(Unary): pass
 @prefix('match', 1)
 class Match(Node): pass
 
-@prefix('->', 2)
+@prefix('->', 1)
 class Lambda0(Unary): pass
 
 @postfix('!', 3)
@@ -169,7 +169,7 @@ class Call0(Unary): pass
 @infix_r(' . ', 2)
 class ComposeR(Binary): pass
 
-@infix('$', 2)
+@infix('$', 11)
 class ComposerL(Binary): pass
 
 @infix('->', 3)
@@ -180,8 +180,11 @@ class Lambda(Binary):
 class IfThen(Binary):
   fields = ['iff', 'then']
 
-@infix_r('=', 5)
+@infix_r('=', 2)
 class Assign(Binary): pass
+
+@infix_r('@', 5)
+class Call(Binary): pass
 
 @infix_r('==', 10)
 class Eq(Binary): pass
@@ -215,10 +218,6 @@ class Brackets(Unary): pass
 
 @subscript('[', ']', -1000)
 class Subscript(Binary): pass
-
-@infix_r('@', 4)
-class Call(Binary): pass
-
 
 @infix(',', 5)
 class Comma(ListNode):
@@ -256,6 +255,28 @@ def rewrite(tree, f, d=0, **kwargs):
   return tree
 
 
+@rewrites
+def implicit_calls(expr, depth):
+  """ Adds "implicit" calls. E.g., expression "a b c" will
+      be parsed as "a(b(c))". This is done by inserting
+      explicit call operator.
+  """
+  if not isinstance(expr, Expr):
+    return expr
+  if len(expr) < 2:
+    return expr
+  result = Expr()
+  prev, nxt = None, None
+  for i,nxt in enumerate(expr):
+    if isinstance(prev, Id) and \
+    (isinstance(nxt, (Int,Id)) or nxt.sym =='('):
+      result.append(symap['@']())
+    result.append(nxt)
+    prev = nxt
+  return result
+
+
+@rewrites
 def precedence(node, depth):
   """ Parses operator precedence """
   if not isinstance(node, Expr):
@@ -266,6 +287,7 @@ def precedence(node, depth):
     raise Exception("cannot process expression %s (%s)" % (node, err)) from Exception
 
 
+@rewrites
 def func_args(func, depth):
   """ Parses function arguments. """
   if not isinstance(func, Lambda):
@@ -290,6 +312,7 @@ def array_csv(array, depth):
     return Brackets(array.value)
   return array
 
+
 @rewrites
 def call_args(call, depth):
   if not isinstance(call, Call):
@@ -297,6 +320,7 @@ def call_args(call, depth):
   if isinstance(call.right, Comma):
     return Call(call.left, Brackets(call.right))
   return call
+
 
 def pretty_print(ast, lvl=0):
   """ Prints AST in a more or less readable form """
@@ -311,32 +335,7 @@ def pretty_print(ast, lvl=0):
     print()
 
 
-def implicit_calls(expr, depth):
-  """ Adds "implicit" calls. E.g., expression "a b c" will
-      be parsed as "a(b(c))". This is done by inserting
-      explicit call operator.
-  """
-  if not isinstance(expr, Expr):
-    return expr
-  if len(expr) < 2:
-    return expr
-  result = Expr()
-  prev, nxt = None, None
-  for i,nxt in enumerate(expr):
-    if isinstance(prev, Id) and \
-    (isinstance(nxt, (Int,Id)) or nxt.sym =='('):
-      result.append(symap['@']())
-    result.append(nxt)
-    prev = nxt
-  return result
-
-
 def parse(ast):
-  ast = rewrite(ast, implicit_calls)
-  log.implicit_calls(ast)
-  ast = rewrite(ast, precedence)
-  log.pratt("after pratt parser:\n", ast)
-
   ast = rewrite(ast, func_args)
   for f in rewrite_funcs:
     log.rewrite("aplying", f.__name__)

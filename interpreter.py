@@ -162,7 +162,7 @@ class BinOp(Binary):
     if self.same_type_operands and type(left) != type(right):
       raise Exception("%s:" \
       "left and right values should have the same type, " \
-      "got\n %s and\n %s instead" % (self.__class__, left, right))
+      "got\n %s \nand\n %s instead" % (self.__class__, left, right))
     assert hasattr(left, opname), \
       "%s (%s) does not support %s operation" % (left, type(left), opname)
     return getattr(left, opname)(right)
@@ -317,6 +317,7 @@ class Call(Binary):
         args = [args]
       assert len(func.args) == len(args)
       for k, v in zip(func.args, args):
+        v =v.eval(frame)  # TODO: Why need extra eval??
         if isinstance(v, ast.Int): v = Int(v.value) # dirty hack to overcome parser bug
         newframe[k.value] = v
       return func.Call(newframe)
@@ -333,9 +334,6 @@ class ComposeR(Binary):
   def eval(self, frame):
     right = self.right.eval(frame)
     left = self.left.eval(frame)
-    print("left", self.left)
-    print("right", self.right)
-    print(type(frame)) #TODO: doesn't work
     return Call(left, right).eval(frame)
 
 
