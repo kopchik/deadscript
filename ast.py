@@ -166,7 +166,7 @@ class Call0(Unary): pass
 ##########
 
 
-@infix_r(' . ', 2)
+@infix_r(' . ', 11)
 class ComposeR(Binary): pass
 
 @infix('$', 11)
