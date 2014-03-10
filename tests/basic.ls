@@ -10,6 +10,17 @@ main = (argc, argv) ->
   assert 2^1^2 == 2
   assert (2^1)^2 == 4
 
+  # working with arrays
+  p "arrays"
+  arr = [1,2,3]
+  p arr
+  # recursion
+  inc = (val, howmuch) ->
+    match
+      howmuch > 0  => inc (val + 1), howmuch - 1
+      _            => val
+  assert inc 0, 3 == 3
+
   # shell invocation
   p "Your resolv.conf:"
   p `cat /etc/resolv.conf`
