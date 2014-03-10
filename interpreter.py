@@ -1,4 +1,4 @@
-from ast import Node, ListNode, Unary, Binary, Leaf, rewrite
+from ast import Node, ListNode, Unary, Binary, Leaf, rewrite, ifelse
 from collections import OrderedDict
 from frame import Frame
 from log import Log
@@ -35,6 +35,9 @@ def replace_nodes(node, depth):
 class Value(Leaf):
   def eval(self, frame):
     return self
+
+  def Eq(self, other):
+    return Bool(self.value == other.value)
 
 
 @replaces(ast.Int)
@@ -275,6 +278,14 @@ class IfThen(ast.IfThen):
     if self.iff.eval(frame):  # this should return Bool
       return True, self.then.eval(frame)
     return False, 0
+
+
+@replaces(ast.IfElse)
+class IfElse(ast.IfElse):
+  def eval(self, frame):
+    if self.iff.eval(frame):
+      return self.then.eval(frame)
+    return self.otherwise.eval(frame)
 
 
 @replaces(ast.Match)

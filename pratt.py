@@ -135,6 +135,21 @@ class subscript:
     symbol(close)
     return cls
 
+class ifelse:
+  def __init__(self, lbp):
+    self.lbp = lbp
+  def __call__(self, cls):
+    def led(self, left):
+      iff = left
+      print("!", iff)
+      then = expr()
+      advance("else")
+      otherwise = expr()
+      return cls(then, iff, otherwise)
+    symbol("if", lbp=self.lbp).led = led
+    symbol("else")
+    return cls
+
 
 ###################
 # PRATT MACHINERY #

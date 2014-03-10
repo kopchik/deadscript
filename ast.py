@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pratt import prefix, infix, infix_r, postfix, brackets, \
-  subscript, action, symap, parse as pratt_parse, expr
+  subscript, action, ifelse, symap, parse as pratt_parse, expr
 from log import Log
 log = Log('ast')
 
@@ -237,7 +237,9 @@ class Var(Leaf):
   def __str__(self):
     return "%s(\"%s\")" % (self.__class__.__name__, self.value)
 
-
+@ifelse(2)
+class IfElse(Node):
+  fields = ['iff', 'then', 'otherwise']
 
 #######################
 # AST TRANSFORMATIONS #
