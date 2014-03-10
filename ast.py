@@ -5,6 +5,11 @@ from pratt import prefix, infix, infix_r, postfix, brackets, \
 from log import Log
 log = Log('ast')
 
+rewrite_funcs = []
+def rewrites(f):
+  rewrite_funcs.append(f)
+  return f
+
 
 #############
 # TEMPLATES #
@@ -25,7 +30,7 @@ class Node(list):
     super().__init__(args)
 
   def __getattr__(self, name):
-    if name not in self.fields:
+    if not self.fields or name not in self.fields:
       raise AttributeError("Unknown attribute %s for %s (%s)" % (name, type(self), self.fields))
     idx = self.fields.index(name)
     return self[idx]
@@ -37,20 +42,27 @@ class Node(list):
     self[idx] = value
 
   def __dir__(self):
-    return self.fields
+    if self.fields:
+      return self.fields
+    else:
+      return super().__dir__()
 
   def __repr__(self):
     cls = self.__class__.__name__
     if self.fields:
       args = ", ".join("%s=%s"%(name, getattr(self,name)) for name in self.fields)
     else:
-      args = ", ".join(map(str,self))
+      args = ", ".join(map(str, self))
     return "%s(%s)" % (cls, args)
 
 
 class ListNode(Node):
   """ Represents a node that is just a list of something. """
   fields = None
+
+  def __repr__(self):
+    cls = self.__class__.__name__
+    return "%s(%s)" % (cls, ", ".join(map(str,self)))
 
 
 class Leaf:
@@ -92,9 +104,9 @@ class Block(Node):
   def nud(self):
     return self
 
-  def __repr__(self):
-    return "Block!(%s)" % ", ".join(str(t) for t in self)
-  __str__ = __repr__
+  # def __repr__(self):
+  #   return "Block!(%s)" % ", ".join(str(t) for t in self)
+  # __str__ = __repr__
 
 
 class Comment(Leaf): pass
@@ -125,6 +137,9 @@ class Assert(Unary): pass
 @action('_')
 class AlwaysTrue(Leaf): pass
 
+@action('return')
+class Return(Leaf):  pass
+
 
 #########
 # UNARY #
@@ -149,46 +164,48 @@ class Call0(Unary): pass
 ##########
 # BINARY #
 ##########
-@infix_r(' . ', 8)
+
+
+@infix_r(' . ', 2)
 class ComposeR(Binary): pass
 
-@infix('$', 8)
+@infix('$', 2)
 class ComposerL(Binary): pass
 
-@infix('+', 10)
-class Add(Binary): pass
+@infix('->', 3)
+class Lambda(Binary):
+  fields = ['args', 'body']
 
-@infix('-', 10)
-class Sub(Binary): pass
-
-@infix('*', 20)
-class Mul(Binary): pass
-
-@infix_r('^', 30)
-class Pow(Binary): pass
-
-@infix_r('=', 1)
-class Assign(Binary): pass
-
-@infix_r('==', 2)
-class Eq(Binary): pass
-
-@infix('<', 2)
-class Less(Binary): pass
-
-@infix('>', 2)
-class More(Binary): pass
-
-@infix('=>', 1)
+@infix('=>', 4)
 class IfThen(Binary):
   fields = ['iff', 'then']
 
-@infix('=~', 3)
+@infix_r('=', 5)
+class Assign(Binary): pass
+
+@infix_r('==', 10)
+class Eq(Binary): pass
+
+@infix('=~', 10)
 class RegMatch(Binary): pass
 
-@infix('->', 2)
-class Lambda(Binary):
-  fields = ['args', 'body']
+@infix('<', 10)
+class Less(Binary): pass
+
+@infix('>', 10)
+class More(Binary): pass
+
+@infix('+', 20)
+class Add(Binary): pass
+
+@infix('-', 20)
+class Sub(Binary): pass
+
+@infix('*', 30)
+class Mul(Binary): pass
+
+@infix_r('^', 40)
+class Pow(Binary): pass
 
 @brackets('(',')')
 class Parens(ListNode): pass
@@ -215,10 +232,6 @@ class Comma(ListNode):
     else:
       values = [left, right]
     super().__init__(*values)
-
-  def __repr__(self):
-    cls = self.__class__.__name__
-    return "(%s %s)" % (cls, list(self))
 
 
 class Var(Leaf):
@@ -269,6 +282,22 @@ def func_args(func, depth):
   return func
 
 
+# @rewrites
+def array_csv(array, depth):
+  if not isinstance(array, Brackets):
+    return array
+  if isinstance(array.value, Comma):
+    return Brackets(array.value)
+  return array
+
+@rewrites
+def call_args(call, depth):
+  if not isinstance(call, Call):
+    return call
+  if isinstance(call.right, Comma):
+    return Call(call.left, Brackets(call.right))
+  return call
+
 def pretty_print(ast, lvl=0):
   """ Prints AST in a more or less readable form """
   prefix = " "*lvl
@@ -294,7 +323,8 @@ def implicit_calls(expr, depth):
   result = Expr()
   prev, nxt = None, None
   for i,nxt in enumerate(expr):
-    if isinstance(prev, Id) and isinstance(nxt, (Int,Id)):
+    if isinstance(prev, Id) and \
+    (isinstance(nxt, (Int,Id)) or nxt.sym =='('):
       result.append(symap['@']())
     result.append(nxt)
     prev = nxt
@@ -308,6 +338,7 @@ def parse(ast):
   log.pratt("after pratt parser:\n", ast)
 
   ast = rewrite(ast, func_args)
-  # log.rewrite("after parsing functions' args:\n", ast)
-  # pretty_print(ast)
+  for f in rewrite_funcs:
+    log.rewrite("aplying", f.__name__)
+    ast = rewrite(ast, f)
   return ast
