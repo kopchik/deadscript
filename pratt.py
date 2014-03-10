@@ -172,4 +172,9 @@ def parse(tokens):
   cur, nxt = shift()
   result = expr()
   log.pratt("result", result)
+  try:
+    next(e)
+    raise Exception("not all tokens was parsed: either grammar error or problem with operators")
+  except StopIteration:
+    pass
   return result
