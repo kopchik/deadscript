@@ -25,10 +25,10 @@ main = (argc, argv) ->
   # higher-order functions
   succ = (arg) -> arg + 1
   assert (succ succ 1) == 3
-  assert succ . succ 1 == 3
+  assert succ . (succ 1) == 3
   #assert succ 0 $ succ $ succ = 3
 
   # control statements
-  #match
-  #  argc == 1  => p "I've got just 1 argument: {argv}"
-  #  _          => p "I've got {argc} arguments: {argv}"
+  match
+    argc == 1  => p "I've got just 1 argument: {argv}"
+    _          => p "I've got {argc} arguments: {argv}"
