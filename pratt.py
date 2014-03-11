@@ -127,17 +127,17 @@ class subscript:
 
 
 class ifelse:
-  """ Ternary operator """
+  """ Ternary operator with a slightly strange syntax VALUE if COND else VALUE"""
   def __init__(self, lbp):
     self.lbp = lbp
 
   def __call__(self, cls):
     def led(self, left):
-      iff = left
-      then = expr()
+      then = left
+      iff = expr()
       advance("else")
       otherwise = expr()
-      return cls(then, iff, otherwise)
+      return cls(iff, then, otherwise)
     symbol("if", lbp=self.lbp).led = led
     symbol("else")
     return cls
