@@ -33,6 +33,7 @@ def replace_nodes(node, depth):
 
 
 class Value(Leaf):
+  """ Base class for values. """
   def eval(self, frame):
     return self
 
@@ -96,6 +97,7 @@ class ShellCmd(Str):
 
 
 class ReturnException(Exception):  pass
+
 @replaces(ast.Return)
 class Return(Leaf):
   def eval(self, frame):
@@ -175,9 +177,6 @@ class BinOp(Binary):
 class Func(Node):
   fields = ['args', 'body']
 
-  # def Assign(self, frame):
-  #   return self
-
   def Call(self, frame):
     return self.body.eval(frame)
 
@@ -213,6 +212,7 @@ class Print(Unary):
     print(r.to_string(frame))
     return r
 
+
 @replaces(ast.Assert)
 class Assert(Unary):
   def eval(self, frame):
@@ -231,12 +231,6 @@ class RegMatch(BinOp):
     super().__init__(left, right)
 
 
-@replaces(ast.Add)
-class Add(BinOp): pass
-
-@replaces(ast.Mul)
-class Mul(BinOp): pass
-
 @replaces(ast.Assign)
 class Assign(BinOp):
   def eval(self, frame):
@@ -245,6 +239,12 @@ class Assign(BinOp):
     self.left.Assign(value, frame)
     return value
 
+
+@replaces(ast.Add)
+class Add(BinOp): pass
+
+@replaces(ast.Mul)
+class Mul(BinOp): pass
 
 @replaces(ast.Eq)
 class Eq(BinOp): pass

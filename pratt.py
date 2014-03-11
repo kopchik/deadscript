@@ -5,12 +5,8 @@ Pratt-like parser.
 Inspired by http://effbot.org/zone/simple-top-down-parsing.htm
 """
 
-from log import Log
 from itertools import chain
 import sys
-
-
-log = Log("pratt")
 symap = {}
 
 
@@ -78,7 +74,8 @@ class postfix:
     return cls
 
 
-class action:
+class nullary:
+  """a zero-arg operator (== keyword)"""
   def __init__(self, sym):
     self.sym = sym
 
@@ -87,12 +84,6 @@ class action:
       return cls(self.sym)
     symbol(self.sym).nud = nud
     return cls
-
-
-class END:
-  lbp = 0
-  def __repr__(self):
-    return "END"
 
 
 class brackets:
@@ -113,8 +104,7 @@ class brackets:
 
 
 class subscript:
-  """ Postfix subscriptions
-  """
+  """ Postfix subscriptions, e.g., array[1]. """
   def __init__(self, *args):
     if len(args) == 2:   # no close tag defined
       self.open, self.lbp = args
@@ -135,13 +125,15 @@ class subscript:
     symbol(close)
     return cls
 
+
 class ifelse:
+  """ Ternary operator """
   def __init__(self, lbp):
     self.lbp = lbp
+
   def __call__(self, cls):
     def led(self, left):
       iff = left
-      print("!", iff)
       then = expr()
       advance("else")
       otherwise = expr()
@@ -149,6 +141,13 @@ class ifelse:
     symbol("if", lbp=self.lbp).led = led
     symbol("else")
     return cls
+
+
+class END:
+  """ A guard at the end of expression. """
+  lbp = 0
+  def __repr__(self):
+    return "END"
 
 
 ###################
@@ -179,17 +178,17 @@ def expr(rbp=0):
 
 def parse(tokens):
   global cur, nxt, e
-  log.pratt("parsing", tokens)
   assert symap, "No operators registered." \
     "Please define at least one operator decorated with infix()/prefix()/etc"
   cur = nxt = None
   e = chain(tokens, [END])
   cur, nxt = shift()
   result = expr()
-  log.pratt("result", result)
+  # sanity check
   try:
     next(e)
-    raise Exception("not all tokens was parsed: either grammar error or problem with operators")
+    raise Exception("not all tokens was parsed: either there is " \
+                    "a grammar error or problem with operators")
   except StopIteration:
     pass
   return result

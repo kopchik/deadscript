@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pratt import prefix, infix, infix_r, postfix, brackets, \
-  subscript, action, ifelse, symap, parse as pratt_parse, expr
+  subscript, nullary, ifelse, symap, parse as pratt_parse, expr
 from log import Log
 log = Log('ast')
 
@@ -85,37 +85,33 @@ class Leaf:
 
 
 class Unary(Node):
+  """ Base class for unary operators. """
   fields = ['arg']
 
 
 class Binary(Node):
+  """ Base class for binary operators. """
   fields = ['left', 'right']
 
 
 class Expr(Node):
-  """ It's an expression. """
+  """ Base class for expressions. """
   def __repr__(self):
     return "Expr(%s)" % ", ".join(str(s) for s in self)
 
 
 class Block(Node):
   """ A block of one or more expressions. """
-  # lbp = 1
   def nud(self):
     return self
 
-  # def __repr__(self):
-  #   return "Block!(%s)" % ", ".join(str(t) for t in self)
-  # __str__ = __repr__
-
-
-class Comment(Leaf): pass
 
 
 ##############
 # Data Types #
 ##############
 
+class Comment(Leaf): pass
 class Str(Leaf):  pass
 class ShellCmd(Leaf):  pass
 class RegEx(Leaf):  pass
@@ -133,11 +129,10 @@ class Print(Unary): pass
 @prefix('assert', 0)
 class Assert(Unary): pass
 
-
-@action('_')
+@nullary('_')
 class AlwaysTrue(Leaf): pass
 
-@action('return')
+@nullary('return')
 class Return(Leaf):  pass
 
 
@@ -165,11 +160,10 @@ class Call0(Unary): pass
 # BINARY #
 ##########
 
-
-@infix_r(' . ', 11)
+@infix_r(' . ', 11)  #TODO: wrong priority
 class ComposeR(Binary): pass
 
-@infix('$', 11)
+@infix('$', 11)      #TODO: wrong priority
 class ComposerL(Binary): pass
 
 @infix('->', 3)
@@ -241,6 +235,7 @@ class Var(Leaf):
 class IfElse(Node):
   fields = ['iff', 'then', 'otherwise']
 
+
 #######################
 # AST TRANSFORMATIONS #
 #######################
@@ -283,10 +278,7 @@ def precedence(node, depth):
   """ Parses operator precedence """
   if not isinstance(node, Expr):
     return node
-  try:
-    return pratt_parse(node)
-  except Exception as err:
-    raise Exception("cannot process expression %s (%s)" % (node, err)) from Exception
+  return pratt_parse(node)
 
 
 @rewrites
@@ -338,6 +330,7 @@ def pretty_print(ast, lvl=0):
 
 
 def parse(ast):
+  """ Parses tokens into ast. """
   ast = rewrite(ast, func_args)
   for f in rewrite_funcs:
     log.rewrite("aplying", f.__name__)
