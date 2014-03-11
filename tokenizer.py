@@ -5,8 +5,8 @@ from log import Log
 log = Log("tokenizer")
 
 # CONSTANTS
-FLOATCONST = RE(r'[-]{0,1}\d+\.\d*')
-INTCONST   = RE(r'[-]{0,1}\d+', Int)
+FLOATCONST = RE(r'\d+\.\d*')
+INTCONST   = RE(r'\d+', Int)
 STRCONST   = RE(r'"(.*)"', Str)
 SHELLCMD   = RE(r'`(.*)`', ShellCmd)
 REGEX      = RE(r'/(.*)/', RegEx)

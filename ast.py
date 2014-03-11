@@ -231,7 +231,7 @@ class Var(Leaf):
   def __str__(self):
     return "%s(\"%s\")" % (self.__class__.__name__, self.value)
 
-@ifelse(2)
+@ifelse(lbp=2)
 class IfElse(Node):
   fields = ['iff', 'then', 'otherwise']
 

@@ -1,5 +1,6 @@
 main = (argc, argv) ->
   # basic arithmetic
+  assert 1 - 1 == 0
   assert 1 + 1 == 2
   assert 1 < 2
   assert 2 > 1
