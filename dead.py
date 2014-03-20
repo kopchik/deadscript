@@ -6,10 +6,9 @@ from tokenizer import tokenize
 from indent import parse as indent_parse
 from interpreter import run
 import argparse
-from sys import exit, setrecursionlimit
+from sys import exit
 
 if __name__ == '__main__':
-  # setrecursionlimit(100)
   parser = argparse.ArgumentParser()
   parser.add_argument('-t', '--tokens', action='store_const', const=True,
                       default=False, help="show tokens")
