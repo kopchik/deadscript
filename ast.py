@@ -36,10 +36,14 @@ class Node(list):
     return self[idx]
 
   def __setattr__(self, name, value):
-    if name not in self.fields:
+    if name in self.fields:
+      idx = self.fields.index(name)
+      self[idx] = value
+    elif name in dir(self.__class__):
+      super().__setattr__(name, value)
+    else:
       raise AttributeError("Unknown attribute %s for %s (%s)" % (name, type(self), self.fields))
-    idx = self.fields.index(name)
-    self[idx] = value
+
 
   def __dir__(self):
     if self.fields:
@@ -70,7 +74,7 @@ class Leaf:
       iteration over them.
   """
   lbp = 0
-  def __init__(self, value):
+  def __init__(self, value=None):
     assert not hasattr(self, 'fields'), \
       "Leaf subclass cannot have fields attribute (it's not a Node)"
     self.value = value
@@ -293,7 +297,7 @@ def func_args(func, depth):
     "function argument can be a single ID or some IDs separated by commas"
   if isinstance(args, Id):
     args = [args]
-  args = [Var(name.value) for name in args]
+  args = ListNode(*[Id(name.value) for name in args])
   func.args = args
   return func
 
