@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from functools import partial
 from termcolor import colored
 from fnmatch import fnmatch
 from copy import copy
