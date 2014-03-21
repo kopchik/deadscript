@@ -31,7 +31,7 @@ class Node(list):
 
   def __getattr__(self, name):
     if not self.fields or name not in self.fields:
-      raise AttributeError("Unknown attribute %s for %s (%s)" % (name, type(self), self.fields))
+      raise AttributeError("Unknown attribute \"%s\" for %s (%s)" % (name, type(self), self.fields))
     idx = self.fields.index(name)
     return self[idx]
 
@@ -42,7 +42,7 @@ class Node(list):
     elif name in dir(self.__class__):
       super().__setattr__(name, value)
     else:
-      raise AttributeError("Unknown attribute %s for %s (%s)" % (name, type(self), self.fields))
+      raise AttributeError("Unknown attribute \"%s\" for %s (%s)" % (name, type(self), self.fields))
 
 
   def __dir__(self):
