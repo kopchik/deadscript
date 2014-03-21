@@ -1,4 +1,4 @@
-from ast import Node, ListNode, Unary, Binary, Leaf, rewrite, ifelse
+from ast import Node, ListNode, Unary, Binary, Leaf, rewrite
 from collections import OrderedDict
 from frame import Frame
 from log import Log
@@ -23,7 +23,7 @@ class replaces:
 
 
 def replace_nodes(node, depth):
-    for oldCls, newCls in astMap.items():
+    for oldCls, newCls in astMap.items():  #may be it should do newCls = asMap(type(node))??
       if isinstance(node, oldCls):
         log.replace("replacing %s (%s)" % (node, type(node)))
         if isinstance(node, Leaf):
@@ -32,8 +32,42 @@ def replace_nodes(node, depth):
     return node
 
 
+##################
+# BUILT-IN TYPES #
+##################
+
+class Type:
+  args = None
+  ret  = None
+
+  def __init__(self, args, ret):
+    if isinstance(args, (list, tuple)):
+      args = [arg if not isinstance(arg, Type) else arg.ret for arg in args]
+    if isinstance(args, Type):
+      args = args.ret
+    if isinstance(ret, Type):
+      ret = ret.ret
+    self.args = args
+    self.ret  = ret
+
+  def __repr__(self):
+    if self.args:
+        return "(%s) -> %s" % (self.args, self.ret.__name__)
+    return self.ret.__name__
+
+  def __eq__(self, other):
+    return self.args == other.args \
+      and self.ret == other.ret
+
+
 class Value(Leaf):
+  type = None
   """ Base class for values. """
+
+  def infer_type(self, frame):
+    self.type = Type(None, self.__class__)
+    return self.type
+
   def eval(self, frame):
     return self
 
@@ -44,7 +78,7 @@ class Value(Leaf):
 @replaces(ast.Int)
 class Int(Value):
   def __init__(self, value):
-    self.value = int(value)
+    super().__init__(int(value))
 
   def to_string(self, frame):
     return str(self.value)
@@ -96,18 +130,13 @@ class ShellCmd(Str):
     return Str(raw.decode())
 
 
-class ReturnException(Exception):  pass
-
-@replaces(ast.Return)
-class Return(Leaf):
-  def eval(self, frame):
-    raise ReturnException
-
-
 @replaces(ast.Brackets)
 class Array(ListNode):
   def __init__(self, args):
     super().__init__(*args)
+
+  def infer_type(self, frame):
+    print("TODO: array does not support type inference")
 
   def to_string(self, frame):
     values = [x.eval(frame).to_string(frame) for x in self]
@@ -118,6 +147,7 @@ class Array(ListNode):
 
   def eval(self, frame):
     return self
+
 
 class Bool(Value):
   def __bool__(self):
@@ -144,12 +174,17 @@ class RegEx(Value):
 
 @replaces(ast.Id)
 class Var(Leaf):
-  def __str__(self):
-    return str(self.value)
+  type = None
+
+  def infer_type(self, frame):
+    ref = frame[self.value]
+    self.type = ref.infer_type(frame)
+    return self.type
 
   def Assign(self, value, frame):
     # self.value actually holds the name
     frame[self.value] = value
+    return value
 
   def eval(self, frame):
     try:
@@ -157,9 +192,22 @@ class Var(Leaf):
     except KeyError:
       raise Exception("unknown variable \"%s\"" % self.value)
 
+  def __str__(self):
+    return str(self.value)
+
 
 class BinOp(Binary):
   same_type_operands = True
+  type = None
+  def infer_type(self, frame):
+    ltype = self.left.infer_type(frame)
+    rtype = self.right.infer_type(frame)
+    assert ltype == rtype, \
+      "left and right types should have the same type." \
+      " Got \"%s\" and \"%s\" respectively." % (ltype, rtype)
+    self.type = Type([ltype, rtype], ltype)
+    return self.type
+
   def eval(self, frame):
     opname = self.__class__.__name__
     left = self.left.eval(frame)
@@ -173,17 +221,6 @@ class BinOp(Binary):
     return getattr(left, opname)(right)
 
 
-@replaces(ast.Lambda)
-class Func(Node):
-  fields = ['args', 'body']
-
-  def Call(self, frame):
-    return self.body.eval(frame)
-
-  def eval(self, frame):
-    return self
-
-
 @replaces(ast.Lambda0)
 class Func0(Node):
   fields = ['body']
@@ -195,8 +232,35 @@ class Func0(Node):
     return self
 
 
+@replaces(ast.Lambda)
+class Func(Node):
+  fields = ['args', 'body']
+  type = None
+
+  def infer_type(self, frame):
+    argtypes = []
+    for arg in self.args:
+      argtypes.append(arg.infer_type(frame))
+    body_t = self.body.infer_type(frame)
+    self.type = Type(argtypes, body_t)
+    return self.type
+
+  def Call(self, frame):
+    return self.body.eval(frame)
+
+  def eval(self, frame):
+    return self
+
+
 @replaces(ast.Block)
 class Block(Node):
+  type = None
+  def infer_type(self, frame):
+    for expr in self:
+      self.type = expr.infer_type(frame)
+    return self.type  # last expression in the block is it's type :)
+
+
   def eval(self, frame):
     r = None
     for e in self:
@@ -207,6 +271,11 @@ class Block(Node):
 @replaces(ast.Print)
 class Print(Unary):
   fields = ['arg']
+  type = None
+  def infer_type(self, frame):
+    self.type = self.arg.infer_type(frame)
+    return self.type
+
   def eval(self, frame):
     r = self.arg.eval(frame)
     print(r.to_string(frame))
@@ -247,7 +316,11 @@ class Add(BinOp): pass
 class Mul(BinOp): pass
 
 @replaces(ast.Eq)
-class Eq(BinOp): pass
+class Eq(BinOp):
+  def infer_type(self, frame):
+    super().infer_type(frame)
+    self.type.ret = Bool
+    return self.type
 
 @replaces(ast.Less)
 class Less(BinOp): pass
@@ -282,6 +355,15 @@ class IfThen(ast.IfThen):
 
 @replaces(ast.IfElse)
 class IfElse(ast.IfElse):
+  type = None
+  def infer_type(self, frame):
+    assert self.iff.infer_type(frame).ret == Bool
+    then_type = self.then.infer_type(frame)
+    else_type = self.otherwise.infer_type(frame)
+    assert then_type == else_type
+    self.type = Type(Bool, else_type)
+    return self.type
+
   def eval(self, frame):
     if self.iff.eval(frame):
       return self.then.eval(frame)
@@ -300,11 +382,33 @@ class Match(Unary):
         return result
 
 
+###########
+# SPECIAL #
+###########
+
+class ReturnException(Exception):  pass
+
+@replaces(ast.Return)
+class Return(Leaf):
+  def eval(self, frame):
+    raise ReturnException
+
+
 @replaces(ast.AlwaysTrue)
 class AlwaysTrue(Value):
   def Bool(self, frame):
     return Bool(True)
 
+
+@replaces(ast.Comment)
+class Comment(Value):
+  def eval(self, frame):
+    pass
+
+
+########
+# CALL #
+########
 
 @replaces(ast.Call0)
 class Call0(Unary):
@@ -334,11 +438,9 @@ class Call(Binary):
       return func.Call(newframe)
 
 
-@replaces(ast.Comment)
-class Comment(Value):
-  def eval(self, frame):
-    pass
-
+##########################
+# Higher-Order Functions #
+##########################
 
 @replaces(ast.ComposeR)
 class ComposeR(Binary):
@@ -348,7 +450,8 @@ class ComposeR(Binary):
     return Call(left, right).eval(frame)
 
 
-def run(ast, args=['<progname>']):
+
+def run(ast, args=['<progname>'], check_types=False):
   ast = rewrite(ast, replace_nodes)
   log.final_ast("the final AST is:\n", ast)
 
@@ -360,10 +463,23 @@ def run(ast, args=['<progname>']):
     print("no main function defined, exiting")
     return 0
 
+  # type inference
+  if check_types:
+    with frame as newframe:
+      newframe['argc'] = Int(len(args))
+      newframe['argv'] = Array(map(Str, args))
+      main = newframe['main']
+      main.infer_type(newframe)
+      assert main.type.ret == Int, \
+        "main() should return Int but got %s" % main.type.ret
+
+
   with frame as newframe:
     newframe['argc'] = Int(len(args))
     newframe['argv'] = Array(map(Str, args))
     r = newframe['main'].Call(newframe)
 
-  if isinstance(r, Int): return r.to_int()
-  else:                  return 0
+  if isinstance(r, Int):
+    return r.to_int()
+  else:
+    return 0
