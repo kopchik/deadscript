@@ -18,6 +18,8 @@ if __name__ == '__main__':
                       default=False, help="show intermediate output")
   parser.add_argument('-n', '--dry-run', action='store_const', const=True,
                       default=False, help="do not execute the program")
+  parser.add_argument('-c', '--check-types', action='store_const', const=True,
+                      default=False, help="perform type inference and checking (disabled by default)")
   parser.add_argument('input', help="path to file")
   parser.add_argument('cmd', nargs="*")
   args = parser.parse_args()
@@ -48,4 +50,4 @@ if __name__ == '__main__':
     cmd = [args.input]+args.cmd
     # run the program
     if not args.dry_run:
-      exit(run(ast, cmd))
+      exit(run(ast, cmd, check_types=args.check_types))
